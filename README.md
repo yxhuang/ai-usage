@@ -7,7 +7,7 @@ WSL（或任意 Linux / macOS）里跑一个轻量 daemon，浏览器 `--app` �
 
 ```
 ┌─────────────────────────────┐
-│ AI 额度        更新于 15:42 ⟳│
+│ AI 用量        更新于 15:42 ⟳│
 │ ┌─────────────────────────┐ │
 │ │ Claude · Pro            │ │
 │ │ 5 小时窗口         39.0%│ │
@@ -24,6 +24,9 @@ WSL（或任意 Linux / macOS）里跑一个轻量 daemon，浏览器 `--app` �
 **节奏刻度**是这个面板和普通用量条的区别：那道细竖线标出「时间窗口已经过去多少」。
 填充越过刻度，说明你消耗得比额度回补更快；落在刻度左边，说明还有余量。
 它把「我用了多少」变成了「我还能不能这么用」。
+
+进度条在正常档用各家的品牌色区分（Claude 珊瑚橙 / Codex 青绿 / Kimi 蓝），
+但**到了 70% 和 90% 一律切换成统一的警戒色**——那两档是状态信号，不让品牌色盖掉。
 
 ## 依赖
 
@@ -49,7 +52,19 @@ bash deploy/install.sh
 journalctl --user -u ai-usage -f     # 看日志
 ```
 
-Windows 侧开成小窗的做法见 [deploy/windows-shortcut.md](deploy/windows-shortcut.md)。
+### Windows 侧
+
+两种开法，见 [deploy/windows-shortcut.md](deploy/windows-shortcut.md)：
+
+- **直开 Chrome `--app` 小窗**：一个快捷方式的事，无地址栏无标签栏。
+- **收进系统托盘当挂件**（[`deploy/tray-widget.ps1`](deploy/tray-widget.ps1)）：窗口不占
+  任务栏和 Alt+Tab，按标题栏的 X 收进托盘而不是退出，双击托盘图标显隐。
+  **零安装**——只用系统自带的 PowerShell + WinForms + `user32.dll`，不引入 Electron 之类
+  的运行时；界面复用同一个 `localhost:8788`，不另写一份。
+  [`deploy/install-widget.ps1`](deploy/install-widget.ps1) 可以把已有的快捷方式一键改指过去。
+
+  代价要知道：它是从外部操纵 Chrome 的窗口，属于 hack——脚本必须常驻，Chrome 大版本
+  升级改了窗口结构有失灵的可能。标题栏砍不掉（Chrome 自绘），保留反倒解决了拖动问题。
 
 ## 三家的数据从哪来
 
@@ -97,6 +112,9 @@ uv run pytest          # 全部测试；不联网、不读真实凭证
 
 ## v1 不做
 
-历史曲线、阈值告警、系统托盘图标、Tauri 壳、OAuth token 自动续期、多用户与远程访问。
+历史曲线、阈值告警、Tauri / Electron 壳、OAuth token 自动续期、多用户与远程访问。
+
+（系统托盘原本也在这个清单里，后来用一个零安装的 PowerShell 脚本从外部套壳解决了，
+没有引入新的运行时依赖——见上面 Windows 侧那节。）
 
 设计文档：[docs/specs/2026-07-26-ai-usage-design.md](docs/specs/2026-07-26-ai-usage-design.md)
