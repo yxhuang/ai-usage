@@ -100,11 +100,19 @@ $sc.Save()
 [`tray-widget.ps1`](tray-widget.ps1)。零安装——不需要 Electron、AutoHotkey 之类的东西，
 只用系统自带的 PowerShell + WinForms + `user32.dll`。
 
-它做的事：启动一个 Chrome `--app` 窗口（界面就是本仓库这套，不另写一份），然后从外部改
-它的窗口样式——去掉 `WS_CAPTION` 变无边框、加 `WS_EX_TOOLWINDOW` 从任务栏和 Alt+Tab
-里摘掉、托盘双击走 `ShowWindow` 显隐。
+它做的事：启动一个 Chrome `--app` 窗口（界面就是本仓库这套，不另写一份），然后从外部
+给它加 `WS_EX_TOOLWINDOW`——从任务栏和 Alt+Tab 里摘掉；托盘双击走 `ShowWindow` 显隐。
 
-跑（Windows 侧 PowerShell，普通权限）：
+**标题栏保留**。原本想砍掉 `WS_CAPTION` 做成无边框，实测无效：Chrome 是自绘标题栏。
+保留反而更好——没有标题栏就没有拖拽区，窗口挪不动。
+
+**按标题栏的 X = 收进托盘，不退出。** 这个 X 拦不住（Chrome 自绘的按钮不走
+`WM_SYSCOMMAND`，跨进程拦 `WM_CLOSE` 得往 Chrome 里注入 DLL），所以做成了"事后翻译"：
+看门狗发现窗口没了就把状态标成隐藏，脚本和托盘图标都留着，下次要显示时再重开一个，
+并还原关掉前的位置和尺寸。效果等同最小化到托盘，区别是再次打开有约 1 秒冷启动、
+页面会重新取一次数。**彻底退出走托盘右键的「退出」。**
+
+### 先手动跑一次确认没问题
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage\deploy\tray-widget.ps1
@@ -114,25 +122,44 @@ powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage
 
 | 开关 | 作用 |
 |---|---|
-| `-Corner TopRight` | 开在哪个角（`TopLeft`/`TopRight`/`BottomLeft`/`BottomRight`/`None`），默认右上 |
-| `-KeepFrame` | 保留系统标题栏。**无边框状态下窗口拖不动**，想随手挪位置就加它（任务栏照样是隐藏的） |
+| `-Corner TopRight` | 开在哪个角（`TopLeft`/`TopRight`/`BottomLeft`/`BottomRight`/`None`），默认右上。窗口自己拖过之后以拖到的位置为准 |
 | `-Width` / `-Height` | 窗口尺寸，默认 370×640 |
 | `-Port` | 面板端口，默认 8788 |
+| `-Frameless` | 尝试砍标题栏。默认关，Chrome 上无效，留给标题栏由系统绘制的浏览器 |
 
-托盘图标右键有：显示/隐藏、四个角贴边、重启面板、退出。双击 = 显隐切换。
+托盘图标：双击 = 显示/隐藏；右键 = 显示/隐藏、四个角贴边、重启面板、退出。
 
-做成快捷方式开机自启的话，目标填
-`powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "<脚本路径>"`，
-丢进 `shell:startup`。脚本启动后会把自己的控制台窗口藏掉，但**启动瞬间仍会闪一下黑框**。
+### 再把快捷方式改成启动它
 
-要知道的代价：
+[`install-widget.ps1`](install-widget.ps1) 一步到位：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage\deploy\install-widget.ps1 -ShortcutName "AI 额度"
+```
+
+它会：
+
+1. 把 `tray-widget.ps1` 复制到 `%LOCALAPPDATA%\ai-usage\`。**不直接指向 `\\wsl$\...`**
+   ——那条 UNC 路径要求 WSL 已经在跑，而快捷方式（尤其开机自启那份）可能比 WSL 更早
+   启动，指过去会直接失败。
+2. 生成 `launcher.vbs`，用它调 PowerShell。直接让快捷方式调 `powershell.exe` 的话，
+   加不加 `-WindowStyle Hidden` 启动瞬间都会闪一下黑框，走 VBS 才是真的一点不闪。
+3. 在开始菜单（当前用户 → 所有用户）和桌面里按名字找到 `.lnk`，把目标改成那个 VBS。
+
+**只改目标和参数，不动图标，不删任何东西**；改之前会把原来的目标和参数打印出来，
+想还原自己抄回属性里即可。加 `-Startup` 顺带在 `shell:startup` 放一份开机自启；
+要给面板带参数用 `-Arguments "-Corner BottomRight"`。
+
+改完之后 WSL 里更新了脚本，记得重跑一次 `install-widget.ps1` 同步过去。
+
+### 要知道的代价
 
 - 这是**从外部操纵别的进程的窗口**，属于 hack。脚本必须常驻（托盘图标是它的，脚本一退
   图标就没）；Chrome 大版本升级若改了窗口结构，有失灵的可能。
-- 它用的是独立 profile（`%LOCALAPPDATA%\ai-usage-widget`），跟第一节那个桌面快捷方式
-  **互不干扰**，两种开法可以并存。
+- 它用的是独立 profile（`%LOCALAPPDATA%\ai-usage-widget`），跟第一节那个直开 Chrome 的
+  用法**互不干扰**，两种开法可以并存。
 - 嫌它脆就换 Electron 自绘窗口那条路——那时网页代码一行都不用改，只是换个壳加载同一个
-  `localhost:8788`。
+  `localhost:8788`，而且关闭按钮就能真正拦住了。
 
 ## 五、打不开时按顺序查
 

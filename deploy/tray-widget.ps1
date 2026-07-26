@@ -7,9 +7,15 @@
     WinForms + user32.dll。做法是启动一个 Chrome --app 窗口（界面完全复用
     http://localhost:<Port> 那一套），再从外部改它的窗口样式：
 
-      · 去掉 WS_CAPTION            → 无边框，看起来像挂件（也顺带没了关闭按钮，不会误关）
       · 加 WS_EX_TOOLWINDOW        → 从任务栏和 Alt+Tab 里消失
       · ShowWindow SW_HIDE/SW_SHOW → 托盘双击切换显隐
+
+    关于标题栏那个 X：**拦不住**。Chrome 自绘标题栏，它的关闭按钮不走 WM_SYSCOMMAND，
+    跨进程拦 WM_CLOSE 要往 Chrome 里注入 DLL，PowerShell 做不到、也不该做。所以这里
+    改成「事后翻译」——看门狗发现窗口没了就把状态标成隐藏（脚本和托盘图标都留着），
+    下次要显示时再懒加载重开一个，并还原关掉前的位置和尺寸。对你而言效果等同于
+    最小化到托盘，唯一区别是再次打开有约 1 秒的冷启动，且页面会重新取一次数。
+    彻底退出走托盘右键的「退出」。
 
     代价（选这条路就要接受的）：这是从外部操纵别的进程的窗口，属于 hack。脚本必须
     常驻（托盘图标是它的，脚本退出图标就没）；Chrome 大版本升级若改了窗口结构有可能
@@ -18,15 +24,15 @@
 .PARAMETER Corner
     开在哪个屏幕角落。None = 不管位置，用 Chrome 自己记住的。
 
-.PARAMETER KeepFrame
-    保留系统标题栏。无边框状态下窗口没法拖动，想随手挪位置就加这个开关
-    （加了之后任务栏仍然是隐藏的，两件事互不影响）。
+.PARAMETER Frameless
+    尝试砍掉标题栏。默认不开：实测 Chrome 自绘标题栏，砍了没效果；而且真砍掉就没有
+    拖拽区、窗口挪不动了。留这个开关是给标题栏由系统绘制的浏览器/版本。
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\tray-widget.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\tray-widget.ps1 -Corner BottomRight -KeepFrame
+    powershell -ExecutionPolicy Bypass -File .\tray-widget.ps1 -Corner BottomRight
 
 .NOTES
     本文件必须存为 **带 BOM 的 UTF-8**，否则 PowerShell 5.1 按 ANSI 读，中文全乱码。
@@ -41,7 +47,7 @@ param(
     [ValidateSet('TopRight', 'BottomRight', 'TopLeft', 'BottomLeft', 'None')]
     [string]$Corner = 'TopRight',
     [int]$Margin = 12,
-    [switch]$KeepFrame,
+    [switch]$Frameless,
     [string]$ChromePath
 )
 
@@ -169,7 +175,10 @@ function Set-WidgetStyle([IntPtr]$h) {
     $ex = ($ex -bor $WS_EX_TOOLWINDOW) -band (-bnot $WS_EX_APPWINDOW)
     [void][W32]::SetWindowLong($h, $GWL_EXSTYLE, $ex)
 
-    if (-not $KeepFrame) {
+    # 标题栏：实测当前 Chrome 是自绘标题栏，砍 WS_CAPTION 对它无效（窗口照旧带栏）。
+    # 保留标题栏反而是好事——没它就没有拖拽区，窗口挪不动。所以默认不砍，
+    # 留个开关给标题栏是系统画的那些浏览器/版本。
+    if ($Frameless) {
         $st = [W32]::GetWindowLong($h, $GWL_STYLE)
         [void][W32]::SetWindowLong($h, $GWL_STYLE, $st -band (-bnot $WS_CAPTION))
     }
@@ -198,21 +207,41 @@ function Set-Corner([IntPtr]$h, [string]$where) {
         ($SWP_NOSIZE -bor $SWP_NOZORDER -bor $SWP_NOACTIVATE))
 }
 
+function Test-PanelAlive {
+    return ($script:Hwnd -ne [IntPtr]::Zero) -and [W32]::IsWindow($script:Hwnd)
+}
+
 function Show-Panel {
-    if ($script:Hwnd -eq [IntPtr]::Zero) { return }
+    # 窗口可能已经被标题栏的 X 关掉了（那是真的关闭，见文件头说明），这时懒加载重开一个
+    if (-not (Test-PanelAlive)) {
+        try {
+            Start-Panel
+        } catch {
+            $script:Notify.ShowBalloonTip(5000, "面板起不来", $_.Exception.Message,
+                [System.Windows.Forms.ToolTipIcon]::Error)
+            return
+        }
+    }
     [void][W32]::ShowWindow($script:Hwnd, $SW_SHOW)
     [void][W32]::SetForegroundWindow($script:Hwnd)
     $script:Visible = $true
 }
 
 function Hide-Panel {
-    if ($script:Hwnd -eq [IntPtr]::Zero) { return }
+    if (-not (Test-PanelAlive)) { $script:Visible = $false; return }
     [void][W32]::ShowWindow($script:Hwnd, $SW_HIDE)
     $script:Visible = $false
 }
 
-function Toggle-Panel {
+function Switch-Panel {
     if ($script:Visible) { Hide-Panel } else { Show-Panel }
+}
+
+# 记住窗口当前的位置和大小，供关掉后重开时还原——否则每次重开都跳回默认角落
+function Save-PanelRect {
+    if (-not (Test-PanelAlive)) { return }
+    $r = New-Object W32+RECT
+    if ([W32]::GetWindowRect($script:Hwnd, [ref]$r)) { $script:LastRect = $r }
 }
 
 # ---------- 启动面板 ----------
@@ -238,7 +267,16 @@ function Start-Panel {
     if (-not $h) { throw "20 秒内没等到标题以「$Title」开头的窗口，面板可能没起来" }
     $script:Hwnd = [IntPtr]$h
     Set-WidgetStyle $script:Hwnd
-    Set-Corner $script:Hwnd $Corner
+
+    if ($script:LastRect) {
+        # 关掉前在哪就还回哪，连尺寸一起（用户可能自己拖过边）
+        $r = $script:LastRect
+        [void][W32]::SetWindowPos($script:Hwnd, [IntPtr]::Zero,
+            $r.Left, $r.Top, ($r.Right - $r.Left), ($r.Bottom - $r.Top),
+            ($SWP_NOZORDER -bor $SWP_NOACTIVATE))
+    } else {
+        Set-Corner $script:Hwnd $Corner
+    }
     $script:Visible = $true
 }
 
@@ -277,14 +315,15 @@ try {
 $console = [W32]::GetConsoleWindow()
 if ($console -ne [IntPtr]::Zero) { [void][W32]::ShowWindow($console, $SW_HIDE) }
 
-$notify = New-Object System.Windows.Forms.NotifyIcon
+$script:Notify = New-Object System.Windows.Forms.NotifyIcon
+$notify = $script:Notify
 $notify.Icon = New-TrayIcon
-$notify.Text = "AI 用量面板"
+$notify.Text = "AI 用量面板（双击显示 / 隐藏）"
 $notify.Visible = $true
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $miToggle = $menu.Items.Add("显示 / 隐藏")
-$miToggle.Add_Click({ Toggle-Panel })
+$miToggle.Add_Click({ Switch-Panel })
 [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
 foreach ($c in @(
@@ -300,15 +339,22 @@ foreach ($c in @(
 [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 $miRestart = $menu.Items.Add("重启面板")
 $miRestart.Add_Click({
+        Save-PanelRect
         Stop-Panel
+        $script:Hwnd = [IntPtr]::Zero
         Start-Sleep -Milliseconds 500
-        Start-Panel
+        try {
+            Start-Panel
+        } catch {
+            $script:Notify.ShowBalloonTip(5000, "面板起不来", $_.Exception.Message,
+                [System.Windows.Forms.ToolTipIcon]::Error)
+        }
     })
 $miExit = $menu.Items.Add("退出")
 $miExit.Add_Click({ $script:Context.ExitThread() })
 
 $notify.ContextMenuStrip = $menu
-$notify.Add_DoubleClick({ Toggle-Panel })
+$notify.Add_DoubleClick({ Switch-Panel })
 
 if (-not $serverUp) {
     $notify.ShowBalloonTip(5000, "服务没连上",
@@ -316,12 +362,26 @@ if (-not $serverUp) {
         [System.Windows.Forms.ToolTipIcon]::Warning)
 }
 
-# 面板窗口被外部关掉（比如 Chrome 崩了）时跟着退出，不留一个空转的托盘图标
+# 看门狗：一是随时记住窗口位置（供关掉后重开还原），二是把「标题栏 X 被按下」
+# 翻译成「收进托盘」——窗口没了不退出脚本，只把状态标成隐藏，等下次要显示时再懒加载重开。
+$script:ClosedHintShown = $false
 $watch = New-Object System.Windows.Forms.Timer
-$watch.Interval = 3000
+$watch.Interval = 800
 $watch.Add_Tick({
-        if ($script:Hwnd -ne [IntPtr]::Zero -and -not [W32]::IsWindow($script:Hwnd)) {
-            $script:Context.ExitThread()
+        if (Test-PanelAlive) {
+            if ($script:Visible) { Save-PanelRect }
+            return
+        }
+        if ($script:Visible) {
+            # 窗口刚刚消失：X 被按了，或者 Chrome 崩了
+            $script:Visible = $false
+            $script:Hwnd = [IntPtr]::Zero
+            if (-not $script:ClosedHintShown) {
+                $script:ClosedHintShown = $true
+                $script:Notify.ShowBalloonTip(4000, "已收进托盘",
+                    "双击托盘图标可以再打开。要彻底退出，右键图标选「退出」。",
+                    [System.Windows.Forms.ToolTipIcon]::Info)
+            }
         }
     })
 $watch.Start()
