@@ -12,6 +12,10 @@ After=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=__PROJECT_DIR__
+; systemd user service 拿到的是精简 PATH（通常只有 /usr/bin:/bin），
+; 而 codex 的包装脚本一般装在 ~/.local/bin —— 不补这一行，
+; Codex provider 会因为找不到命令而永远走降级路径。
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=__UV_BIN__ run --no-sync python -m server.main
 Restart=on-failure
 RestartSec=10s
