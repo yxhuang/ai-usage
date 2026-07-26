@@ -111,7 +111,27 @@ $sc.TargetPath = "$env:SystemRoot\System32\wscript.exe"
 $sc.Arguments = "`"$vbsPath`""
 $sc.WorkingDirectory = $InstallDir
 # 图标不动：保留你自己挑过的那个
-$sc.Save()
+
+try {
+    $sc.Save()
+} catch [System.UnauthorizedAccessException] {
+    # 快捷方式在 C:\ProgramData（全体用户的开始菜单）里，写它要管理员。
+    # 不在这里自动提权：提权后的进程未必访问得到 \\wsl$，而且该不该提权是用户的决定。
+    # Save() 失败时快捷方式原样未动，没有半吊子状态。
+    Write-Host ""
+    Write-Warning "没权限改这个快捷方式（它在全体用户的开始菜单里）。前两步已完成，只差这一步。"
+    Write-Host "开一个管理员 PowerShell，粘下面这段（自包含，不依赖 \\wsl`$ 路径）："
+    Write-Host ""
+    Write-Host "`$sh = New-Object -ComObject WScript.Shell"
+    Write-Host "`$sc = `$sh.CreateShortcut('$lnk')"
+    Write-Host "`$sc.TargetPath = '$env:SystemRoot\System32\wscript.exe'"
+    Write-Host "`$sc.Arguments = '`"$vbsPath`"'"
+    Write-Host "`$sc.WorkingDirectory = '$InstallDir'"
+    Write-Host "`$sc.Save()"
+    Write-Host ""
+    Write-Host "（或者把快捷方式挪到当前用户的开始菜单 %APPDATA%\Microsoft\Windows\Start Menu\Programs 再重跑本脚本，那里不需要管理员。）"
+    exit 1
+}
 
 Write-Host ""
 Write-Host "已改为：wscript.exe `"$vbsPath`""
