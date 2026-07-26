@@ -54,7 +54,7 @@ $sc.Save()
 
 **在哪跑**：Windows 侧的 PowerShell，**不是 WSL 终端**。`Win + X` → 「终端」或
 「Windows PowerShell」，普通权限即可；确认提示符是 `PS C:\Users\...>` 而不是
-`carls@...:~$`（终端里的 Ubuntu 标签页不行）。跑之前先**关掉已经开着的小窗**，
+`<用户名>@...:~$`（终端里的 Ubuntu 标签页不行）。跑之前先**关掉已经开着的小窗**，
 否则 Chrome 会拿旧记录复用窗口。
 
 脚本里的快捷方式名是写死的，先确认真实名字对得上：
@@ -115,7 +115,7 @@ $sc.Save()
 ### 先手动跑一次确认没问题
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage\deploy\tray-widget.ps1
+powershell -ExecutionPolicy Bypass -File \\wsl$\<发行版>\home\<用户名>\ai-usage\deploy\tray-widget.ps1
 ```
 
 常用开关：
@@ -134,7 +134,7 @@ powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage
 [`install-widget.ps1`](install-widget.ps1) 一步到位：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage\deploy\install-widget.ps1 -ShortcutName "AI 额度"
+powershell -ExecutionPolicy Bypass -File \\wsl$\<发行版>\home\<用户名>\ai-usage\deploy\install-widget.ps1 -ShortcutName "AI 额度"
 ```
 
 它会：

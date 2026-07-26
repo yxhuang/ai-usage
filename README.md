@@ -1,19 +1,28 @@
 # ai-usage
 
-一屏看清 Claude / Codex / Kimi 三家订阅的额度水位与重置时间。
+[![CI](https://github.com/yxhuang/ai-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/yxhuang/ai-usage/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+![Local only](https://img.shields.io/badge/network-loopback%20only-brightgreen.svg)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/yxhuang/ai-usage/pulls)
 
-WSL（或任意 Linux / macOS）里跑一个轻量 daemon，浏览器 `--app` 模式开成无地址栏小窗，
-观感接近原生 widget。只调各家的**账户元数据接口**，不消耗任何对话额度。
+**Three AI subscriptions. One small window. Know before you hit the wall.**
+
+English | [简体中文](docs/README.zh-CN.md)
+
+If you pay for Claude Pro, ChatGPT Plus, and a Kimi plan, your quota lives in three
+places and none of them tell you anything until you're already rate-limited. `ai-usage`
+reads all three and puts them in one always-there panel.
 
 ```
 ┌─────────────────────────────┐
-│ AI 用量        更新于 15:42 ⟳│
+│ AI usage       updated 15:42│
 │ ┌─────────────────────────┐ │
 │ │ Claude · Pro            │ │
-│ │ 5 小时窗口         39.0%│ │
-│ │ ▓▓▓▓▓▓▓▓▎  ┆            │ │← 竖线是「节奏刻度」
-│ │ 周三 19:29 重置 · 剩 3 小时│ │
-│ │ 周额度             44.0%│ │
+│ │ 5-hour window      39.0%│ │
+│ │ ▓▓▓▓▓▓▓▓▎  ┆            │ │← the pace tick
+│ │ resets Wed 19:29 · 3h   │ │
+│ │ Weekly             44.0%│ │
 │ │ ▓▓▓▓▓▓▓▓▓▓▎   ┆         │ │
 │ └─────────────────────────┘ │
 │ ┌ Codex · Plus ───────────┐ │
@@ -21,100 +30,182 @@ WSL（或任意 Linux / macOS）里跑一个轻量 daemon，浏览器 `--app` �
 └─────────────────────────────┘
 ```
 
-**节奏刻度**是这个面板和普通用量条的区别：那道细竖线标出「时间窗口已经过去多少」。
-填充越过刻度，说明你消耗得比额度回补更快；落在刻度左边，说明还有余量。
-它把「我用了多少」变成了「我还能不能这么用」。
+## The pace tick
 
-进度条在正常档用各家的品牌色区分（Claude 珊瑚橙 / Codex 青绿 / Kimi 蓝），
-但**到了 70% 和 90% 一律切换成统一的警戒色**——那两档是状态信号，不让品牌色盖掉。
+That thin vertical line is the whole point. It marks **how much of the time window has
+already elapsed**.
 
-## 依赖
+If your usage bar is to the left of it, you're spending slower than the window refills and
+you can keep going. If the bar crosses it, you're on track to run out early. A plain
+percentage tells you what you spent. The pace tick tells you whether you can keep spending
+it that way — which is the question you actually have at 2pm on a Wednesday.
 
-- Python ≥ 3.11
-- [uv](https://docs.astral.sh/uv/)
-- 三家的 CLI 已各自登录过（面板**只读复用**它们已有的凭证，自己不做登录流程）
+## What it does not do
 
-运行时依赖只有 `fastapi` / `uvicorn` / `httpx`；前端是纯 HTML/CSS/JS，零构建链、零 node 依赖。
+It never sends your credentials anywhere. The daemon reads the token files your CLIs
+already wrote, calls the vendor's own account-metadata endpoint, and keeps the token in
+memory. Nothing is written to disk except the usage numbers themselves, and the server
+refuses to bind to anything but a loopback address.
 
-## 快速开始
+It also costs you nothing to run: these are account endpoints, not inference. Polling
+does not consume a single token of your quota.
+
+## Quick start
 
 ```bash
-git clone <repo> ai-usage && cd ai-usage
+git clone https://github.com/yxhuang/ai-usage && cd ai-usage
 uv sync
-cp config.example.toml config.toml   # 可选，不建也能按默认值跑
-uv run python -m server.main         # 打开 http://127.0.0.1:8788
+uv run python -m server.main     # open http://127.0.0.1:8788
 ```
 
-常驻使用（systemd user unit，开机自启）：
+That's it — no config file needed. Every provider that isn't logged in simply shows an
+error card while the others keep working.
+
+To keep it running in the background (systemd user unit, starts at boot):
 
 ```bash
 bash deploy/install.sh
-journalctl --user -u ai-usage -f     # 看日志
+journalctl --user -u ai-usage -f
 ```
 
-### Windows 侧
+## Requirements
 
-两种开法，见 [deploy/windows-shortcut.md](deploy/windows-shortcut.md)：
+- **Python 3.11+** and [uv](https://docs.astral.sh/uv/)
+- At least one of the three CLIs installed and logged in. The panel **reuses their existing
+  credentials read-only** — it has no login flow of its own, and never asks for a password.
 
-- **直开 Chrome `--app` 小窗**：一个快捷方式的事，无地址栏无标签栏。
-- **收进系统托盘当挂件**（[`deploy/tray-widget.ps1`](deploy/tray-widget.ps1)）：窗口不占
-  任务栏和 Alt+Tab，按标题栏的 X 收进托盘而不是退出，双击托盘图标显隐。
-  **零安装**——只用系统自带的 PowerShell + WinForms + `user32.dll`，不引入 Electron 之类
-  的运行时；界面复用同一个 `localhost:8788`，不另写一份。
-  [`deploy/install-widget.ps1`](deploy/install-widget.ps1) 可以把已有的快捷方式一键改指过去。
+Runtime dependencies are `fastapi`, `uvicorn`, and `httpx`. The frontend is plain
+HTML/CSS/JS: no build step, no node, no npm.
 
-  代价要知道：它是从外部操纵 Chrome 的窗口，属于 hack——脚本必须常驻，Chrome 大版本
-  升级改了窗口结构有失灵的可能。标题栏砍不掉（Chrome 自绘），保留反倒解决了拖动问题。
+## Platforms
 
-## 三家的数据从哪来
+| | Status |
+|---|---|
+| Linux | Primary target. Developed and run on WSL2 Ubuntu. |
+| macOS | Should work — same code paths, but not yet tested on a real Mac. Reports welcome. |
+| Windows | Run the daemon **inside WSL**, then open the panel from Windows (see below). WSL2 forwards `localhost` automatically, so no extra networking setup. |
 
-| Provider | 取数方式 | 说明 |
+The daemon itself is plain Python and has no OS-specific code. The Windows-specific parts
+are only about *displaying* the window.
+
+## Making it a desktop widget
+
+A browser window in `--app` mode already looks close to a native widget — no address bar,
+no tabs. Two ways to run it on Windows, both documented in
+[deploy/windows-shortcut.md](deploy/windows-shortcut.md):
+
+**1. Just a shortcut.** One `chrome.exe --app=http://localhost:8788 --window-size=370,640`
+and you have a clean little window.
+
+**2. Live in the system tray** — [`deploy/tray-widget.ps1`](deploy/tray-widget.ps1).
+The window stays out of the taskbar and Alt+Tab, the title bar's close button tucks it into
+the tray instead of quitting, and double-clicking the tray icon toggles it. It reopens right
+where you left it.
+
+**Zero install**: it's built on PowerShell + WinForms + `user32.dll`, all of which ship with
+Windows. No Electron, no Tauri, no extra runtime — and it drives the same
+`localhost:8788` page, so there is no second UI to maintain.
+[`deploy/install-widget.ps1`](deploy/install-widget.ps1) will repoint an existing shortcut
+at it.
+
+Be aware of what that costs: the script manipulates a Chrome window from the outside, which
+is a hack. It has to stay resident, and a major Chrome release that changes the window
+structure could break it. The title bar can't be removed at all (Chrome draws its own) —
+which turned out to be a feature, since without it the window can't be dragged.
+
+## Where the numbers come from
+
+| Provider | How | Notes |
 |---|---|---|
-| Claude | `GET api.anthropic.com/api/oauth/usage` | 复用 claude CLI 的 OAuth token；返回 5 小时 / 周窗口，以及独立计费的 extra credit 池 |
-| Codex | 临时拉起 `codex app-server`，JSON-RPC 调 `account/rateLimits/read` | 取完即关，不常驻；失败自动降级为解析本地 session 记录里的最近一条限额快照（标 `stale` + 数据时刻） |
-| Kimi | `GET api.kimi.com/coding/v1/usages` | 用 `sk-kimi-*` API key；报文只给绝对值，百分比由本地换算 |
+| Claude | `GET api.anthropic.com/api/oauth/usage` | Reuses the claude CLI's OAuth token. Returns the 5-hour and weekly windows, plus the separately billed extra-credit pool. |
+| Codex | Spawns `codex app-server`, calls `account/rateLimits/read` over JSON-RPC | Started on demand and shut down right after. If that fails, falls back to the most recent rate-limit snapshot in the local session logs, flagged `stale` with its timestamp. |
+| Kimi | `GET api.kimi.com/coding/v1/usages` | Uses an `sk-kimi-*` API key. The response only carries absolute numbers; percentages are computed locally. |
 
-各 provider 完全独立：一家挂了只有那张卡片显示错误态，其余照常。
-轮询默认 300 秒一次，单家失败指数退避（最长 30 分钟），不影响其他家。
+Providers are fully independent: if one breaks, only that card shows an error and the rest
+keep updating. Polling defaults to 300s, with exponential backoff per provider on failure
+(capped at 30 minutes).
 
-## 配置
+**These are unofficial endpoints.** None of them is a documented public API, and any of the
+three vendors could change or remove theirs without notice. See the disclaimer below.
 
-所有配置项见 [config.example.toml](config.example.toml)，不建 `config.toml` 就用内置默认值。
-几个值得知道的：
+## Configuration
 
-- `server.port`：默认 `8788`。`server.host` **只接受回环地址**，填别的会直接拒绝启动。
-- `providers.claude.proxy`：Anthropic 走代理时在这里填。**必须显式配**——
-  daemon 是非交互进程，不读 shell 配置文件，不会自动继承代理环境变量。
-- `providers.kimi`：key 按 `api_key` → 环境变量 → 密钥文件三级回退，第一个取到的生效。
-  密钥文件是用正则提取变量值，**不会 source/exec** 它。
-- `providers.codex.command`：拉起 app-server 的命令，可换成自己的包装脚本。
+Everything is optional — see [config.example.toml](config.example.toml). Without a
+`config.toml`, built-in defaults apply. The ones worth knowing:
 
-## 安全
+- `server.port` — defaults to `8788`. `server.host` **only accepts loopback addresses**;
+  anything else refuses to start.
+- `providers.claude.proxy` — if you reach Anthropic through a proxy, set it here.
+  **You must set it explicitly**: the daemon is a non-interactive process, doesn't read your
+  shell config, and will not inherit proxy environment variables.
+- `providers.kimi` — the key falls back through `api_key` → environment variable → key file,
+  first hit wins. The key file is parsed with a regex; it is **never** sourced or executed.
+- `providers.codex.command` — the command used to spawn app-server, in case you wrap it.
 
-- 服务只绑回环地址，配置层面强制校验，不给「不小心暴露到局域网」留口子。
-- 凭证**只读复用**各 CLI 已有的文件，token 只在内存里，绝不落盘、绝不入日志。
-  落盘缓存 `data/cache.json` 只有用量数字。
-- 日志遇到异常只记 provider 与异常类型，不记异常正文和 traceback
-  （正文可能夹带带 token 的 URL）。
-- 不读取、不展示、不存储任何账号身份信息（邮箱、组织 ID、用户 ID）。
-- `config.toml` 与 `data/` 已在 `.gitignore`；若把 key 直接写进 `config.toml`，请 `chmod 600`。
+## Security
 
-## 开发
+- The server binds to loopback only, enforced in config validation. There is no option to
+  expose it to your LAN by accident.
+- Credentials are **read-only reuse** of the files your CLIs already wrote. Tokens live in
+  memory, are never written to disk, and are never logged. The on-disk cache
+  (`data/cache.json`) holds usage numbers and nothing else.
+- On error, logs record the provider name and exception type only — never the message or
+  traceback, since those can carry a token-bearing URL.
+- No account identity is read, displayed, or stored: no email, no org ID, no user ID.
+- `config.toml` and `data/` are gitignored. If you put a key directly in `config.toml`,
+  `chmod 600` it.
+
+## Development
 
 ```bash
-uv run pytest          # 全部测试；不联网、不读真实凭证
+uv run pytest      # 68 tests; no network, no real credentials
 ```
 
-测试用 `httpx.MockTransport` 与临时目录构造报文和假凭证。
-`tests/conftest.py` 会从测试进程里剥掉凭证类环境变量——
-这条防护来自一次真实事故：某条用例没清理环境变量，
-把开发机上的真实 key 打进了断言失败输出。测试永远不该看见真实凭证。
+Tests build responses and fake credentials with `httpx.MockTransport` and temp directories.
+`tests/conftest.py` strips credential-shaped environment variables out of the test process —
+that guard exists because of a real incident, where a test that didn't clean up its
+environment printed a real key into an assertion failure. Tests should never be able to see
+a real credential.
 
-## v1 不做
+## Status
 
-历史曲线、阈值告警、Tauri / Electron 壳、OAuth token 自动续期、多用户与远程访问。
+Early, and honest about it. The logic is covered by 68 offline tests, but it has only run on
+one machine so far. If a provider's response shape differs on your account — a different
+plan tier, a different region — a bug report with the (redacted) payload would genuinely
+help.
 
-（系统托盘原本也在这个清单里，后来用一个零安装的 PowerShell 脚本从外部套壳解决了，
-没有引入新的运行时依赖——见上面 Windows 侧那节。）
+Not planned for v1: history graphs, threshold alerts, a Tauri/Electron shell, OAuth token
+auto-renewal, multi-user or remote access.
 
-设计文档：[docs/specs/2026-07-26-ai-usage-design.md](docs/specs/2026-07-26-ai-usage-design.md)
+## Contributing
+
+Issues and PRs welcome, especially a report from a machine that isn't mine, or a macOS
+confirmation. If you touch the code, note that no absolute `/home/<user>` path should end up
+in a commit.
+
+## Disclaimer
+
+`ai-usage` is a personal, unofficial tool. It is **not affiliated with, endorsed by, or
+supported by** Anthropic, OpenAI, or Moonshot AI. Product names are used only to identify
+the services it reads.
+
+It relies on undocumented account-metadata endpoints that those vendors may change or remove
+at any time, and it reads credential files that their CLIs manage. It only ever reads them,
+and only sends them back to the vendor they belong to — but you run it at your own risk, and
+you are responsible for staying within your provider's terms of service. Provided as-is,
+without warranty. See [LICENSE](LICENSE).
+
+## Acknowledgments
+
+Built with help from the very assistants whose quota it tracks: Claude Code, Codex CLI, and
+Kimi CLI. Design notes:
+[docs/specs/2026-07-26-ai-usage-design.md](docs/specs/2026-07-26-ai-usage-design.md).
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+---
+
+⭐ If this saved you from finding out about a rate limit the hard way, a star helps others
+find it.
