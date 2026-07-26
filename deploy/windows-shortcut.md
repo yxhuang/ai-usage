@@ -10,7 +10,7 @@ WSL2 的 `localhost` 会自动转发到 Windows，所以 Windows 侧浏览器可
 在桌面右键 → 新建 → 快捷方式，目标填（端口按 `config.toml` 里的实际值，默认 8788）：
 
 ```
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --app=http://localhost:8788 --window-size=400,560
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --app=http://localhost:8788 --window-size=400,700
 ```
 
 Edge 同理，把可执行文件换成
@@ -23,7 +23,7 @@ Edge 同理，把可执行文件换成
 $shell = New-Object -ComObject WScript.Shell
 $sc = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath("Desktop")) "AI 额度.lnk"))
 $sc.TargetPath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-$sc.Arguments  = '--app=http://localhost:8788 --window-size=400,560 --user-data-dir="%LOCALAPPDATA%\ai-usage-profile"'
+$sc.Arguments  = '--app=http://localhost:8788 --window-size=400,700 --user-data-dir="%LOCALAPPDATA%\ai-usage-profile"'
 $sc.IconLocation = "$($sc.TargetPath),0"
 $sc.Save()
 ```
@@ -34,7 +34,7 @@ $sc.Save()
 
 | 参数 | 作用 |
 |---|---|
-| `--window-size=400,560` | 初始窗口尺寸，页面按 380×540 排版 |
+| `--window-size=400,700` | **初始**窗口尺寸。页面加载后会按实际内容高度自适应一次，把窗口调到刚好装下、不出滚动条；浏览器不允许脚本改窗口尺寸时，就以这里给的值为准 |
 | `--window-position=x,y` | 固定开在屏幕某个角落 |
 | `--user-data-dir=%LOCALAPPDATA%\ai-usage-profile` | 用独立的浏览器 profile，不受主浏览器窗口影响、也不会被误关 |
 

@@ -182,3 +182,32 @@ async def test_limits_wrong_type_is_error(tmp_path):
     usage = await _make_provider(tmp_path, body=json.dumps(payload)).fetch()
     assert usage.status == "error"
     assert usage.windows == []
+
+
+async def test_extra_credits_note_shows_money(tmp_path):
+    """额外 credit 池除了百分比，还要给出金额（fixture: 3300/10000 分 → $33 / $100）。"""
+    usage = await _make_provider(tmp_path).fetch()
+    credit = next(w for w in usage.windows if w.id == "extra_credits")
+    assert credit.note == "$33 / $100"
+    # 其余窗口没有绝对量可显示
+    assert all(w.note is None for w in usage.windows if w.id != "extra_credits")
+
+
+async def test_credits_note_falls_back_to_extra_usage(tmp_path):
+    """spend 缺失时退回 extra_usage 自带字段。"""
+    payload = json.loads(FIXTURE)
+    del payload["spend"]
+    usage = await _make_provider(tmp_path, body=json.dumps(payload)).fetch()
+    credit = next(w for w in usage.windows if w.id == "extra_credits")
+    assert credit.note == "$33 / $100"
+
+
+async def test_credits_note_none_when_amounts_unusable(tmp_path):
+    """金额字段是脏数据时宁可不显示，也不显示错的金额。"""
+    payload = json.loads(FIXTURE)
+    payload["spend"] = {"used": {"amount_minor": None}, "limit": {}}
+    payload["extra_usage"] = {"is_enabled": True, "utilization": 33.0}
+    usage = await _make_provider(tmp_path, body=json.dumps(payload)).fetch()
+    credit = next(w for w in usage.windows if w.id == "extra_credits")
+    assert credit.note is None
+    assert credit.used_pct == 33.0

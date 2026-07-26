@@ -26,6 +26,51 @@ _KIND_MAP: dict[str, tuple[str, str]] = {
 
 _AUTH_EXPIRED_MSG = "OAuth token 已过期——随便用一次 claude CLI 即自动续期"
 
+_CURRENCY_SYMBOLS = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥", "CNY": "¥"}
+
+
+def _fmt_money(amount_minor: float, exponent: int, currency: str) -> str:
+    """把最小货币单位格式化成人看的金额：2298/2/USD → $22.98，10000/2/USD → $100。"""
+    value = amount_minor / (10**exponent)
+    symbol = _CURRENCY_SYMBOLS.get(currency.upper(), currency.upper() + " ")
+    text = f"{value:.{exponent}f}".rstrip("0").rstrip(".") if exponent else f"{value:.0f}"
+    return f"{symbol}{text}"
+
+
+def _credits_note(payload: dict) -> str | None:
+    """额外用量 credit 池的金额说明，如 "$22.98 / $100"。
+
+    优先用顶层 spend（结构最规范），退回 extra_usage 自带的字段。
+    任何一步取不到就返回 None——宁可不显示，也不显示错的金额。
+    """
+    spend = payload.get("spend")
+    if isinstance(spend, dict):
+        used, limit = spend.get("used"), spend.get("limit")
+        if isinstance(used, dict) and isinstance(limit, dict):
+            try:
+                currency = used.get("currency") or limit.get("currency") or "USD"
+                return (
+                    _fmt_money(used["amount_minor"], int(used.get("exponent", 2)), currency)
+                    + " / "
+                    + _fmt_money(limit["amount_minor"], int(limit.get("exponent", 2)), currency)
+                )
+            except (KeyError, TypeError, ValueError):
+                pass
+
+    extra = payload.get("extra_usage")
+    if isinstance(extra, dict):
+        try:
+            exponent = int(extra.get("decimal_places", 2))
+            currency = extra.get("currency") or "USD"
+            return (
+                _fmt_money(float(extra["used_credits"]), exponent, currency)
+                + " / "
+                + _fmt_money(float(extra["monthly_limit"]), exponent, currency)
+            )
+        except (KeyError, TypeError, ValueError):
+            pass
+    return None
+
 
 class ClaudeProvider:
     id = "claude"
@@ -147,6 +192,7 @@ class ClaudeProvider:
                     label="额外用量 credit",
                     used_pct=float(extra.get("utilization") or 0.0),
                     resets_at=None,
+                    note=_credits_note(payload),
                 )
             )
         return windows

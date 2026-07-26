@@ -127,19 +127,21 @@ function renderWindow(w) {
   }
   row.appendChild(bar);
 
+  // 底行：有重置时间就显示倒计时，否则显示绝对量（如按金额计费的 credit 池）
   const resetText = fmtReset(w.resets_at);
-  if (resetText) {
-    const reset = document.createElement("div");
-    reset.className = "window-reset";
-    reset.textContent = resetText;
+  const parts = [resetText, w.note].filter(Boolean);
+  if (parts.length > 0) {
+    const foot = document.createElement("div");
+    foot.className = "window-reset";
+    foot.textContent = parts.join(" · ");
     // 只在明显偏快时才点破，避免每行都挂个提示
     if (pace !== null && used - pace > 5 && used >= 25) {
       const ahead = document.createElement("span");
       ahead.className = "ahead";
       ahead.textContent = " · 快于节奏";
-      reset.appendChild(ahead);
+      foot.appendChild(ahead);
     }
-    row.appendChild(reset);
+    row.appendChild(foot);
   }
   return row;
 }
@@ -201,6 +203,26 @@ function render(data) {
     : "暂无数据";
 }
 
+/* 自适应窗口高度：把窗口调到刚好装下内容，不出滚动条。
+ *
+ * 只在 --app 模式的独立小窗里有意义，且浏览器未必允许脚本改顶层窗口尺寸；
+ * 不允许就静默跳过，退回快捷方式里给的初始高度。 */
+let fitAttempts = 0;
+
+function fitWindowToContent() {
+  if (fitAttempts >= 3) return; // 防止和浏览器的尺寸约束来回拉锯
+  try {
+    const chrome = window.outerHeight - window.innerHeight; // 标题栏 + 边框
+    const needed = document.documentElement.scrollHeight;
+    const target = Math.min(1200, Math.max(320, needed + chrome));
+    if (Math.abs(target - window.outerHeight) <= 8) return; // 已经合适
+    fitAttempts += 1;
+    window.resizeTo(window.outerWidth, target);
+  } catch (e) {
+    fitAttempts = 3; // 不被允许，别再试了
+  }
+}
+
 let lastData = null;
 
 /** 只重画，不重新取数——用于让倒计时和节奏刻度随时间走。 */
@@ -217,6 +239,7 @@ async function load(url, options, failMsg) {
     lastData = data;
     render(data);
     clearError();
+    fitWindowToContent(); // 卡片数量/窗口条数变了，高度可能要跟着变
   } catch (e) {
     // 保留旧卡片，只在顶部提示
     showError(failMsg);

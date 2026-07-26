@@ -161,3 +161,40 @@ def test_naive_fetched_at_in_cache_no_crash(tmp_path):
     marked = cache.mark_stale_if_old(900)  # 不抛 TypeError
     assert marked[0].status == "stale"
     assert marked[0].fetched_at.tzinfo is not None
+
+
+def test_note_survives_roundtrip(tmp_path):
+    """note 是后加的字段，落盘/回读必须无损；旧缓存没有该键时也要能读。"""
+    from server.providers.base import ProviderUsage, UsageWindow
+
+    cache = Cache(tmp_path / "cache.json")
+    usage = ProviderUsage(
+        id="claude",
+        name="Claude",
+        plan=None,
+        windows=[
+            UsageWindow(id="extra_credits", label="额外用量 credit",
+                        used_pct=33.0, resets_at=None, note="$33 / $100"),
+            UsageWindow(id="5h", label="5 小时窗口", used_pct=1.0, resets_at=None),
+        ],
+        status="ok",
+        error=None,
+        fetched_at=datetime.now(timezone.utc),
+    )
+    cache.set(usage)
+
+    reloaded = Cache(tmp_path / "cache.json")
+    reloaded.load()
+    windows = reloaded.get("claude").windows
+    assert windows[0].note == "$33 / $100"
+    assert windows[1].note is None
+
+
+def test_from_dict_without_note_key():
+    """兼容升级前写下的缓存：没有 note 键也不能炸。"""
+    from server.providers.base import UsageWindow
+
+    w = UsageWindow.from_dict(
+        {"id": "5h", "label": "5 小时窗口", "used_pct": 1.0, "resets_at": None}
+    )
+    assert w.note is None

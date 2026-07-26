@@ -23,6 +23,9 @@ class UsageWindow:
     label: str  # 中文显示名
     used_pct: float  # 0-100
     resets_at: datetime | None  # tz-aware
+    # 百分比之外值得一并显示的绝对量，已格式化好（如按金额计费的 "$22.98 / $100"）。
+    # 没有就留 None——不是每种额度都有有意义的绝对量。
+    note: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -30,6 +33,7 @@ class UsageWindow:
             "label": self.label,
             "used_pct": self.used_pct,
             "resets_at": self.resets_at.isoformat() if self.resets_at else None,
+            "note": self.note,
         }
 
     @classmethod
@@ -39,6 +43,7 @@ class UsageWindow:
             label=d["label"],
             used_pct=float(d["used_pct"]),
             resets_at=parse_dt(d.get("resets_at")),
+            note=d.get("note"),
         )
 
 
