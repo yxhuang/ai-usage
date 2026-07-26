@@ -10,10 +10,23 @@ WSL2 的 `localhost` 会自动转发到 Windows，所以 Windows 侧浏览器可
 在桌面右键 → 新建 → 快捷方式，目标填（端口按 `config.toml` 里的实际值，默认 8788）：
 
 ```
-"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --app=http://localhost:8788 --window-size=400,560
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --app=http://localhost:8788 --window-size=400,560
 ```
 
-Chrome 同理，把可执行文件换成 `chrome.exe` 即可。
+Edge 同理，把可执行文件换成
+`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe` 即可。
+
+也可以用 PowerShell 直接建（脚本文件请存成 **带 BOM 的 UTF-8**，
+否则 PowerShell 5.1 会按 ANSI 读，中文快捷方式名会变乱码）：
+
+```powershell
+$shell = New-Object -ComObject WScript.Shell
+$sc = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath("Desktop")) "AI 额度.lnk"))
+$sc.TargetPath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+$sc.Arguments  = '--app=http://localhost:8788 --window-size=400,560 --user-data-dir="%LOCALAPPDATA%\ai-usage-profile"'
+$sc.IconLocation = "$($sc.TargetPath),0"
+$sc.Save()
+```
 
 改个名字（如「AI 额度」），再进属性 → 更改图标挑一个顺眼的。
 
