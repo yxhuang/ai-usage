@@ -1,0 +1,4 @@
+{"timestamp":"2026-01-01T07:00:00.000Z","type":"session_meta","payload":{"id":"test-session"}}
+{"timestamp":"2026-01-01T07:05:00.000Z","type":"event_msg","payload":{"type":"other_event"}}
+{"timestamp":"2026-01-01T07:10:00.000Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"limit_id":"codex","primary":{"used_percent":9.0,"window_minutes":10080,"resets_at":1779990000},"secondary":null,"plan_type":"testplan"}}}
+{"timestamp":"2026-01-01T07:15:33.540Z","type":"event_msg","payload":{"type":"token_count","info":{},"rate_limits":{"limit_id":"codex","limit_name":null,"primary":{"used_percent":14.0,"window_minutes":10080,"resets_at":1780000000},"secondary":null,"credits":{"has_credits":false,"unlimited":false,"balance":"0"},"individual_limit":null,"spend_control_reached":null,"plan_type":"testplan","rate_limit_reached_type":null}}}

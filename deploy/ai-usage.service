@@ -1,0 +1,27 @@
+; ai-usage 面板服务（systemd user unit 模板）
+;
+; 本文件是模板：__PROJECT_DIR__ 与 __UV_BIN__ 由 deploy/install.sh 在安装时替换成
+; 本机实际路径，生成的 unit 写到 ~/.config/systemd/user/ai-usage.service（不入库）。
+; 直接 cp 本文件是不能用的，请跑 install.sh。
+
+[Unit]
+Description=ai-usage 本地 AI 订阅额度面板
+Documentation=https://github.com/yxhuang/ai-usage
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__PROJECT_DIR__
+ExecStart=__UV_BIN__ run --no-sync python -m server.main
+Restart=on-failure
+RestartSec=10s
+; 日志走 journald：journalctl --user -u ai-usage -f
+StandardOutput=journal
+StandardError=journal
+
+; 只读取凭证、只绑回环口，不需要任何额外权限
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

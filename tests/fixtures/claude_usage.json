@@ -1,0 +1,22 @@
+{
+  "five_hour": {"utilization": 99.0, "resets_at": "2026-01-01T00:00:00.000000+00:00", "limit_dollars": null, "used_dollars": null, "remaining_dollars": null},
+  "seven_day": {"utilization": 98.0, "resets_at": "2026-01-03T00:00:00.000000+00:00", "limit_dollars": null, "used_dollars": null, "remaining_dollars": null},
+  "seven_day_oauth_apps": null,
+  "seven_day_opus": null,
+  "seven_day_sonnet": null,
+  "seven_day_cowork": null,
+  "seven_day_omelette": null,
+  "tangelo": null,
+  "iguana_necktie": null,
+  "omelette_promotional": null,
+  "nimbus_quill": null,
+  "cinder_cove": null,
+  "amber_ladder": null,
+  "extra_usage": {"is_enabled": true, "monthly_limit": 10000, "used_credits": 3300.0, "utilization": 33.0, "currency": "USD", "decimal_places": 2, "disabled_reason": null, "user_disabled": false, "spend_limit_reached": false, "credits_ever_enabled": true, "daily": null, "weekly": null},
+  "limits": [
+    {"kind": "session", "group": "session", "percent": 11, "severity": "normal", "resets_at": "2026-01-01T00:00:00.000000+00:00", "scope": null, "is_active": false},
+    {"kind": "weekly_all", "group": "weekly", "percent": 22, "severity": "normal", "resets_at": "2026-01-03T00:00:00.000000+00:00", "scope": null, "is_active": true}
+  ],
+  "spend": {"used": {"amount_minor": 3300, "currency": "USD", "exponent": 2}, "limit": {"amount_minor": 10000, "currency": "USD", "exponent": 2}, "percent": 33, "severity": "normal", "enabled": true, "disabled_reason": null, "cap": {"money": null, "credits": {"amount_minor": 10000, "exponent": 2}}, "balance": null, "auto_reload": null, "disclaimer": "", "can_purchase_credits": false, "can_toggle": false},
+  "member_dashboard_available": false
+}

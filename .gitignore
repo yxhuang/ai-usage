@@ -1,0 +1,10 @@
+# 凭证与本地数据 —— 永不入库
+config.toml
+data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

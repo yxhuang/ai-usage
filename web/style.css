@@ -1,0 +1,268 @@
+/* ai-usage 面板样式
+ *
+ * 约束：无任何外部资源（字体走系统栈），离线可开。
+ * 取向：颜色只用来表达"状态"，从不用来装饰；克制留给节奏刻度这一个记忆点。
+ */
+
+:root {
+  /* 浅色（默认） */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --line: #e4e6ec;
+  --track: #eceef3;
+  --ink: #1b1d23;
+  --ink-muted: #6c7280;
+  --ink-faint: #9ba1ad;
+  --fill: #5b6ee8;       /* 正常：冷静的靛蓝 */
+  --fill-warn: #c98229;  /* ≥70% */
+  --fill-danger: #cf4d63;/* ≥90% */
+  --pace: #1b1d23;
+  --focus: #5b6ee8;
+
+  --radius: 10px;
+  --row-gap: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131519;
+    --surface: #1a1d23;
+    --line: #272b33;
+    --track: #23262d;
+    --ink: #e7e9ee;
+    --ink-muted: #969cab;
+    --ink-faint: #6d7484;
+    --fill: #8b96f2;
+    --fill-warn: #dda44f;
+    --fill-danger: #e6788c;
+    --pace: #e7e9ee;
+    --focus: #8b96f2;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 12px 13px 16px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+    "PingFang SC", "Hiragino Sans GB", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 顶栏 ---------- */
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.header-right {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.updated {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#refresh-btn {
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+#refresh-btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
+#refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- 错误横幅 ---------- */
+
+.error-banner {
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fill-danger);
+  font-size: 12px;
+}
+
+.error-banner[hidden] {
+  display: none;
+}
+
+/* ---------- 卡片 ---------- */
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 11px 13px 13px;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.card-name {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+.card-plan {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.card-plan::before {
+  content: "·";
+  margin-right: 6px;
+}
+
+.card-stale {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-error {
+  font-size: 12px;
+  color: var(--ink-muted);
+  padding: 2px 0 1px;
+}
+
+/* ---------- 单个窗口 ---------- */
+
+.window + .window {
+  margin-top: var(--row-gap);
+}
+
+.window-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.window-label {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.window-pct {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* 进度条：轨道 + 填充 + 节奏刻度 */
+.bar {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fill);
+  transition: width 180ms ease-out;
+}
+
+.bar-fill.warn {
+  background: var(--fill-warn);
+}
+
+.bar-fill.danger {
+  background: var(--fill-danger);
+}
+
+/* 节奏刻度：时间窗口已过去的比例。
+   填充越过它 = 消耗快于额度回补速度。 */
+.pace {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--pace);
+  opacity: 0.34;
+  transform: translateX(-1px);
+}
+
+.window-reset {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.window-reset .ahead {
+  color: var(--ink-muted);
+}
+
+.empty {
+  color: var(--ink-faint);
+  font-size: 12px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill {
+    transition: none;
+  }
+}

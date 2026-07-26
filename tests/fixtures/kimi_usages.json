@@ -1,0 +1,30 @@
+{
+  "user": {
+    "userId": "redacted",
+    "region": "REGION_CN",
+    "membership": {"level": "LEVEL_INTERMEDIATE"},
+    "businessId": ""
+  },
+  "usage": {
+    "limit": "100",
+    "used": "13",
+    "remaining": "87",
+    "resetTime": "2026-07-28T00:46:25.304440Z"
+  },
+  "limits": [
+    {
+      "window": {"duration": 300, "timeUnit": "TIME_UNIT_MINUTE"},
+      "detail": {
+        "limit": "100",
+        "used": "5",
+        "remaining": "95",
+        "resetTime": "2026-07-26T10:46:25.304440Z"
+      }
+    }
+  ],
+  "parallel": {"limit": "20"},
+  "totalQuota": {},
+  "authentication": {"method": "METHOD_API_KEY", "scope": "FEATURE_CODING"},
+  "subType": "TYPE_PURCHASE",
+  "domain": "DOMAIN_NEXUS"
+}
