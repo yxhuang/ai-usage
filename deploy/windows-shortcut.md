@@ -94,7 +94,47 @@ $sc.Save()
 嫌麻烦也有个土办法：**直接拖窗口边缘调到顺眼为止**——Chrome 会把这个尺寸记下来，
 下次打开就是它。缺点是换机器或重建 profile 后就没了，快捷方式里的值才是可移植的那份。
 
-## 四、打不开时按顺序查
+## 四、进阶：收进系统托盘，不占任务栏
+
+想要「主界面像挂件停在桌面、任务栏上看不到、双击托盘图标才显隐」，用
+[`tray-widget.ps1`](tray-widget.ps1)。零安装——不需要 Electron、AutoHotkey 之类的东西，
+只用系统自带的 PowerShell + WinForms + `user32.dll`。
+
+它做的事：启动一个 Chrome `--app` 窗口（界面就是本仓库这套，不另写一份），然后从外部改
+它的窗口样式——去掉 `WS_CAPTION` 变无边框、加 `WS_EX_TOOLWINDOW` 从任务栏和 Alt+Tab
+里摘掉、托盘双击走 `ShowWindow` 显隐。
+
+跑（Windows 侧 PowerShell，普通权限）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File \\wsl$\Ubuntu\home\carls\=dev=\ai-usage\deploy\tray-widget.ps1
+```
+
+常用开关：
+
+| 开关 | 作用 |
+|---|---|
+| `-Corner TopRight` | 开在哪个角（`TopLeft`/`TopRight`/`BottomLeft`/`BottomRight`/`None`），默认右上 |
+| `-KeepFrame` | 保留系统标题栏。**无边框状态下窗口拖不动**，想随手挪位置就加它（任务栏照样是隐藏的） |
+| `-Width` / `-Height` | 窗口尺寸，默认 370×640 |
+| `-Port` | 面板端口，默认 8788 |
+
+托盘图标右键有：显示/隐藏、四个角贴边、重启面板、退出。双击 = 显隐切换。
+
+做成快捷方式开机自启的话，目标填
+`powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "<脚本路径>"`，
+丢进 `shell:startup`。脚本启动后会把自己的控制台窗口藏掉，但**启动瞬间仍会闪一下黑框**。
+
+要知道的代价：
+
+- 这是**从外部操纵别的进程的窗口**，属于 hack。脚本必须常驻（托盘图标是它的，脚本一退
+  图标就没）；Chrome 大版本升级若改了窗口结构，有失灵的可能。
+- 它用的是独立 profile（`%LOCALAPPDATA%\ai-usage-widget`），跟第一节那个桌面快捷方式
+  **互不干扰**，两种开法可以并存。
+- 嫌它脆就换 Electron 自绘窗口那条路——那时网页代码一行都不用改，只是换个壳加载同一个
+  `localhost:8788`。
+
+## 五、打不开时按顺序查
 
 1. WSL 里能不能开：`curl -s --noproxy '*' http://127.0.0.1:8788/api/summary`
 2. 服务是否在跑：`systemctl --user status ai-usage`
