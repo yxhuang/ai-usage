@@ -149,6 +149,8 @@ function renderWindow(w) {
 function renderCard(p) {
   const card = document.createElement("section");
   card.className = "card";
+  // 品牌色靠这个属性挂到 CSS 上（.card[data-provider="..."] 覆写 --fill）
+  if (p.id) card.dataset.provider = p.id;
 
   const head = document.createElement("div");
   head.className = "card-head";
@@ -203,19 +205,23 @@ function render(data) {
     : "暂无数据";
 }
 
-/* 自适应窗口高度：把窗口调到刚好装下内容，不出滚动条。
+/* 自适应窗口高度：把窗口调到刚好装下内容，不出滚动条、也不留多余空白。
  *
  * 只在 --app 模式的独立小窗里有意义，且浏览器未必允许脚本改顶层窗口尺寸；
- * 不允许就静默跳过，退回快捷方式里给的初始高度。 */
+ * 不允许就静默跳过，退回快捷方式里给的初始高度。
+ *
+ * 量高度必须量 body 而不是 documentElement：后者会被撑满视口，窗口比内容高时
+ * 它的 scrollHeight 恒等于视口高度，于是永远看不出"内容其实更矮"——窗口只能
+ * 变高不能变矮，底部就留下一截空白。body 默认高度自适应内容，能如实反映。 */
 let fitAttempts = 0;
 
 function fitWindowToContent() {
   if (fitAttempts >= 3) return; // 防止和浏览器的尺寸约束来回拉锯
   try {
     const chrome = window.outerHeight - window.innerHeight; // 标题栏 + 边框
-    const needed = document.documentElement.scrollHeight;
-    const target = Math.min(1200, Math.max(320, needed + chrome));
-    if (Math.abs(target - window.outerHeight) <= 8) return; // 已经合适
+    const needed = document.body.offsetHeight; // 含 padding，且不受滚动位置影响
+    const target = Math.min(1200, Math.max(200, needed + chrome));
+    if (Math.abs(target - window.outerHeight) <= 4) return; // 已经合适
     fitAttempts += 1;
     window.resizeTo(window.outerWidth, target);
   } catch (e) {
