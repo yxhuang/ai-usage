@@ -14,21 +14,15 @@ If you pay for Claude Pro, ChatGPT Plus, and a Kimi plan, your quota lives in th
 places and none of them tell you anything until you're already rate-limited. `ai-usage`
 reads all three and puts them in one always-there panel.
 
-```
-┌─────────────────────────────┐
-│ AI usage       updated 15:42│
-│ ┌─────────────────────────┐ │
-│ │ Claude · Pro            │ │
-│ │ 5-hour window      39.0%│ │
-│ │ ▓▓▓▓▓▓▓▓▎  ┆            │ │← the pace tick
-│ │ resets Wed 19:29 · 3h   │ │
-│ │ Weekly             44.0%│ │
-│ │ ▓▓▓▓▓▓▓▓▓▓▎   ┆         │ │
-│ └─────────────────────────┘ │
-│ ┌ Codex · Plus ───────────┐ │
-│ └ Kimi · …    ────────────┘ │
-└─────────────────────────────┘
-```
+<p align="center">
+  <img src="docs/panel-dark.png" width="380"
+       alt="The ai-usage panel in dark mode: three cards, one per provider. Claude Pro shows a 5-hour window at 27%, weekly at 48%, and a $22.98/$100 extra-credit pool at 23%. Codex Plus shows weekly at 8%. Kimi shows a 5-hour window at 0% and weekly at 15%. Each bar carries a faint vertical tick marking how much of the time window has elapsed.">
+</p>
+
+> The UI is currently Chinese-only. See [Status](#status).
+
+Every bar above sits to the left of its tick, which means all three have room to spare.
+That tick is the thing worth explaining.
 
 ## The pace tick
 
@@ -173,6 +167,10 @@ Early, and honest about it. The logic is covered by 68 offline tests, but it has
 one machine so far. If a provider's response shape differs on your account — a different
 plan tier, a different region — a bug report with the (redacted) payload would genuinely
 help.
+
+**The interface is Chinese-only right now.** Labels come from both the frontend and the
+provider layer, so English support means touching both — it's a wanted contribution, not a
+hard problem. Open an issue if you'd use it.
 
 Not planned for v1: history graphs, threshold alerts, a Tauri/Electron shell, OAuth token
 auto-renewal, multi-user or remote access.
