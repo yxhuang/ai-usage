@@ -84,8 +84,8 @@ Windows 上有两种开法，都写在 [deploy/windows-shortcut.md](../deploy/wi
 一个干净的小窗。
 
 **二、收进系统托盘** —— [`deploy/tray-widget.ps1`](../deploy/tray-widget.ps1)。
-窗口不占任务栏和 Alt+Tab；按标题栏的关闭按钮是收进托盘而不是退出；双击托盘图标切换显隐，
-再打开时回到你上次放的位置和尺寸。
+窗口不占任务栏和 Alt+Tab；标题栏的关闭和最小化按钮都是收进托盘而不是退出；单击托盘图标
+切换显隐（双击也行，不会闪一下），再打开时回到你上次放的位置和尺寸。
 
 **零安装**：只用系统自带的 PowerShell + WinForms + `user32.dll`，不引入 Electron、
 Tauri 之类的运行时；而且它驱动的就是同一个 `localhost:8788` 页面，不存在第二套界面要维护。

@@ -96,12 +96,12 @@ $sc.Save()
 
 ## 四、进阶：收进系统托盘，不占任务栏
 
-想要「主界面像挂件停在桌面、任务栏上看不到、双击托盘图标才显隐」，用
+想要「主界面像挂件停在桌面、任务栏上看不到、点托盘图标才显隐」，用
 [`tray-widget.ps1`](tray-widget.ps1)。零安装——不需要 Electron、AutoHotkey 之类的东西，
 只用系统自带的 PowerShell + WinForms + `user32.dll`。
 
 它做的事：启动一个 Chrome `--app` 窗口（界面就是本仓库这套，不另写一份），然后从外部
-给它加 `WS_EX_TOOLWINDOW`——从任务栏和 Alt+Tab 里摘掉；托盘双击走 `ShowWindow` 显隐。
+给它加 `WS_EX_TOOLWINDOW`——从任务栏和 Alt+Tab 里摘掉；托盘单击走 `ShowWindow` 显隐。
 
 **标题栏保留**。原本想砍掉 `WS_CAPTION` 做成无边框，实测无效：Chrome 是自绘标题栏。
 保留反而更好——没有标题栏就没有拖拽区，窗口挪不动。
@@ -127,7 +127,21 @@ powershell -ExecutionPolicy Bypass -File \\wsl$\<发行版>\home\<用户名>\ai-
 | `-Port` | 面板端口，默认 8788 |
 | `-Frameless` | 尝试砍标题栏。默认关，Chrome 上无效，留给标题栏由系统绘制的浏览器 |
 
-托盘图标：双击 = 显示/隐藏；右键 = 显示/隐藏、四个角贴边、重启面板、退出。
+托盘图标：单击 = 显示/隐藏（双击等效，第二下会被吞掉，不会显示完又隐藏）；
+右键 = 显示/隐藏、四个角贴边、重启面板、退出。
+
+标题栏那两个按钮 Chrome 自绘、都拦不住，所以都是事后翻译成「收进托盘」：X = 真关掉，
+下次显示时重开（约 1 秒冷启动，位置和尺寸照旧）；最小化 = 直接收起来，下次显示时
+`SW_RESTORE` 还原。注意最小化的窗口 `IsWindowVisible` 照样是 true、`GetWindowRect` 报的是
+缩略条的尺寸（实测 159×27），所以判显隐要连 `IsIconic` 一起看，记位置也得跳过那一刻——
+否则面板会被「还原」成屏幕角落一个小条，而且它不在任务栏，没处调得回来。冷启动重开面板的那几秒里托盘没反应，
+这期间补点的击键会被作废——不然它们会在面板刚打开时集中送达，把窗口又关回去。
+点击判据有测试：`powershell -ExecutionPolicy Bypass -File .\tests\tray-click-filter.ps1`（要在
+Windows 侧跑），改 `Test-AcceptClick` 之前先跑它。
+
+⚠️ **改了 `tray-widget.ps1` 要重新部署才生效**：下面的 `install-widget.ps1` 是把脚本**复制**到
+`%LOCALAPPDATA%\ai-usage\`，托盘跑的是那份副本，改仓库不会自动同步。重跑一次
+`install-widget.ps1`，再从托盘右键「退出」旧图标、重新点快捷方式即可。
 
 ### 再把快捷方式改成启动它
 

@@ -92,9 +92,10 @@ no tabs. Two ways to run it on Windows, both documented in
 and you have a clean little window.
 
 **2. Live in the system tray** — [`deploy/tray-widget.ps1`](deploy/tray-widget.ps1).
-The window stays out of the taskbar and Alt+Tab, the title bar's close button tucks it into
-the tray instead of quitting, and double-clicking the tray icon toggles it. It reopens right
-where you left it.
+The window stays out of the taskbar and Alt+Tab, the title bar's close and minimize buttons
+both tuck it into the tray instead of quitting, and a single click on the tray icon toggles it
+(a double click works too, without the show-then-hide flicker). It reopens right where you
+left it.
 
 **Zero install**: it's built on PowerShell + WinForms + `user32.dll`, all of which ship with
 Windows. No Electron, no Tauri, no extra runtime — and it drives the same

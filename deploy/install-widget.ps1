@@ -146,3 +146,6 @@ if ($Startup) {
 
 Write-Host ""
 Write-Host "完成。双击快捷方式试一下——不会有黑框闪过，托盘出图标即为成功。"
+Write-Host ""
+Write-Host "注意：托盘跑的是上面那份**副本**。以后改了仓库里的 tray-widget.ps1，"
+Write-Host "重跑一次本脚本才会生效（快捷方式和图标不用重设），改完记得退出旧的托盘图标再启动。"
