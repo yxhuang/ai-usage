@@ -16,6 +16,8 @@
 
 .NOTES
     只能在 Windows 侧的 PowerShell 里跑（要 System.Windows.Forms）；Linux CI 跳过。
+    5.1 和 7 都能跑，实测两边全绿。但本文件同样必须是**带 BOM 的 UTF-8**——pwsh 写文件
+    默认不带 BOM，用它改写会把 BOM 弄丢，5.1 再读就崩在中文上。
 
     powershell -ExecutionPolicy Bypass -File .\tests\tray-click-filter.ps1
 #>

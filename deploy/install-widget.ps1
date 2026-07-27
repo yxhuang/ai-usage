@@ -36,6 +36,11 @@
 .NOTES
     在 Windows 侧的 PowerShell 里跑，普通权限即可。
     本文件必须存为 **带 BOM 的 UTF-8**，否则 PowerShell 5.1 按 ANSI 读，中文全乱码。
+    ⚠️ PowerShell 7（pwsh）写文件默认不带 BOM，用它改写本文件会把 BOM 弄丢；非要用就加
+    -Encoding utf8BOM。生成的 launcher.vbs 走 -Encoding ASCII、内容纯 ASCII，不受影响。
+
+    launcher.vbs 里调的是 powershell.exe（系统自带的 5.1），刻意不用 pwsh——挂件开机自启，
+    依赖一个自己装的运行时，卸载或换机就静默起不来。理由详见 tray-widget.ps1 的 .NOTES。
 #>
 
 [CmdletBinding()]

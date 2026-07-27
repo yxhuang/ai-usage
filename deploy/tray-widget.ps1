@@ -51,6 +51,14 @@
 
 .NOTES
     本文件必须存为 **带 BOM 的 UTF-8**，否则 PowerShell 5.1 按 ANSI 读，中文全乱码。
+    ⚠️ PowerShell 7（pwsh）写文件默认**不带 BOM**，用它改写本文件（Set-Content / 重定向
+    之类）会把 BOM 弄丢，5.1 一读就崩在中文注释上。非要用 pwsh 改，加 -Encoding utf8BOM；
+    用编辑器正常保存则没这问题。
+
+    运行时是 Windows 自带的 **PowerShell 5.1**（launcher.vbs 调 powershell.exe），
+    别改成 pwsh：5.1 随系统自带、不会被卸载或升级搬走（挂件开机自启，起不来是静默失败，
+    你只会觉得点了快捷方式没反应），启动还快 ~100ms（实测 150-180ms vs 250-265ms）。
+    脚本用到的东西 5.1 全都支持，7 换不来任何好处。
 #>
 
 [CmdletBinding()]
