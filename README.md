@@ -1,5 +1,6 @@
 # ai-usage
 
+[![Release](https://img.shields.io/github/v/release/yxhuang/ai-usage?label=release)](https://github.com/yxhuang/ai-usage/releases/latest)
 [![CI](https://github.com/yxhuang/ai-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/yxhuang/ai-usage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
@@ -175,6 +176,10 @@ hard problem. Open an issue if you'd use it.
 
 Not planned for v1: history graphs, threshold alerts, a Tauri/Electron shell, OAuth token
 auto-renewal, multi-user or remote access.
+
+Released versions and what changed in each: [CHANGELOG.md](CHANGELOG.md). Versions follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html); below 1.0.0, minor bumps may
+change behaviour.
 
 ## Contributing
 

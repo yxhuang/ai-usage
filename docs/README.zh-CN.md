@@ -1,5 +1,6 @@
 # ai-usage
 
+[![Release](https://img.shields.io/github/v/release/yxhuang/ai-usage?label=release)](https://github.com/yxhuang/ai-usage/releases/latest)
 [![CI](https://github.com/yxhuang/ai-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/yxhuang/ai-usage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
@@ -149,6 +150,9 @@ uv run pytest          # 68 项测试；不联网、不读真实凭证
 带上脱敏后的报文提个 issue 会非常有帮助。
 
 v1 不做：历史曲线、阈值告警、Tauri / Electron 壳、OAuth token 自动续期、多用户与远程访问。
+
+各版本改了什么，见 [CHANGELOG.md](../CHANGELOG.md)（英文，与 GitHub Releases 同一份内容）。
+版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)；1.0.0 之前，次版本号变动也可能改变行为。
 
 ## 参与
 
