@@ -118,6 +118,11 @@ Chrome 大版本升级若改了窗口结构有失灵的可能。标题栏根本�
 - `server.port`：默认 `8788`。`server.host` **只接受回环地址**，填别的会直接拒绝启动。
 - `providers.claude.proxy`：Anthropic 走代理时在这里填。**必须显式配**——
   daemon 是非交互进程，不读 shell 配置文件，不会自动继承代理环境变量。
+  反过来却不成立：代理软件开着 **TUN 模式**时会抢走默认路由、在 IP 层接管流量，
+  这不是任何 provider 配置能豁免的。若某家突然持续超时、而用 `curl` 走代理端口却正常，
+  先看 `ip route get <目标 IP>`，别急着怀疑上游 API。
+- `poller.first_retry_seconds`：**首次**轮询失败后等多久重试，默认 `60` 秒。
+  之后每次连续失败翻倍，上限是 `max_backoff_seconds`；成功的轮询一律用 `interval_seconds`。
 - `providers.kimi`：key 按 `api_key` → 环境变量 → 密钥文件三级回退，第一个取到的生效。
   密钥文件是用正则提取变量值，**不会 source/exec** 它。
 - `providers.codex.command`：拉起 app-server 的命令，可换成自己的包装脚本。

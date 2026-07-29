@@ -71,13 +71,17 @@ function fmtTime(iso) {
   return `${hh}:${mm}`;
 }
 
-function fmtStale(iso) {
+function fmtAgo(iso) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / MINUTE);
-  if (mins < 1) return "数据来自 刚刚";
-  if (mins < 60) return `数据来自 ${mins} 分钟前`;
+  if (mins < 1) return "刚刚";
+  if (mins < 60) return `${mins} 分钟前`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `数据来自 ${hours} 小时前`;
-  return `数据来自 ${Math.floor(hours / 24)} 天前`;
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
+}
+
+function fmtStale(iso) {
+  return `数据来自 ${fmtAgo(iso)}`;
 }
 
 function showError(msg) {
@@ -164,11 +168,17 @@ function renderCard(p) {
     plan.textContent = p.plan;
     head.appendChild(plan);
   }
+  // 错误卡片没有数据可言，只说清最后一次尝试是什么时候，别写成"数据来自"
   if (p.status === "stale") {
     const stale = document.createElement("span");
     stale.className = "card-stale";
     stale.textContent = fmtStale(p.fetched_at);
     head.appendChild(stale);
+  } else if (p.status === "error" || p.status === "auth_expired") {
+    const attempt = document.createElement("span");
+    attempt.className = "card-stale";
+    attempt.textContent = `最后尝试 ${fmtAgo(p.fetched_at)}`;
+    head.appendChild(attempt);
   }
   card.appendChild(head);
 

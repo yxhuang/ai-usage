@@ -53,12 +53,15 @@ class Poller:
             )
         else:
             self._failures[provider.id] += 1
+            # 首次失败后快速重试，再按 2 的幂逐步拉长，封顶 max_backoff_seconds
             delay = min(
-                self._config.interval_seconds * 2 ** self._failures[provider.id],
+                self._config.first_retry_seconds
+                * 2 ** (self._failures[provider.id] - 1),
                 self._config.max_backoff_seconds,
             )
             self._next_due[provider.id] = now + timedelta(seconds=delay)
-            logger.info(
+            # 只记 provider id 和 status：错误正文可能夹带 URL / 凭证片段
+            logger.warning(
                 "provider %s 失败（%s），%ds 后重试",
                 provider.id,
                 usage.status,

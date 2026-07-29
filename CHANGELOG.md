@@ -8,6 +8,39 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
 
 ## [Unreleased]
 
+Fallout from a real incident: a proxy's TUN mode was switched on without the user noticing,
+it took over the default route, and the Kimi provider timed out for hours. The provider
+itself was fine — but recovering from it took far longer than it should have, and nothing in
+the logs said why.
+
+### Changed
+
+- **Backoff now starts at 60 seconds instead of 10 minutes.** The delay was
+  `interval_seconds * 2 ** failures`, so with the default 5-minute interval a *single*
+  failed poll pushed the next attempt 10 minutes out, and three failures reached the
+  30-minute cap. A provider therefore stayed dark long after the network had recovered. It
+  is now `first_retry_seconds * 2 ** (failures - 1)` — 60s, 120s, 240s, … capped by
+  `max_backoff_seconds` — configurable via the new `poller.first_retry_seconds`.
+- **Poll failures are logged at WARNING rather than INFO**, so they survive uvicorn's
+  default log configuration. During the incident above, twelve hours of consecutive
+  timeouts produced not one line in `journalctl`. The message still carries only the
+  provider id and status: error text can contain URLs or credential fragments.
+- **Error and auth-expired cards now say when the last attempt was** ("最后尝试 3 分钟前").
+  Previously only `stale` cards carried a timestamp, so a failed card gave no hint whether
+  it was one minute or one afternoon old. Worth noting the wording differs from the stale
+  card's "数据来自 …": an error card has no data behind it, only an attempt.
+
+### Fixed
+
+- Corrected the `KimiProvider` docstring, which claimed the provider "禁止走代理" on the
+  strength of `trust_env=False`. That flag only means environment proxy variables are
+  ignored — a proxy running in TUN mode intercepts at the IP layer, where this module has
+  no visibility. The network behaviour is unchanged; only the claim was wrong.
+
+### Notes
+
+- 69 offline tests, including coverage of the new backoff schedule.
+
 ## [0.2.0] — 2026-07-27
 
 Tray interaction rework. The widget could get into states where clicking its tray icon did

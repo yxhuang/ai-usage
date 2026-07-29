@@ -49,12 +49,18 @@ class FakeProvider:
 
 
 def _poller(
-    tmp_path, providers, interval: int = 10, max_backoff: int = 50, cache=None
+    tmp_path,
+    providers,
+    interval: int = 10,
+    max_backoff: int = 50,
+    first_retry: int = 10,
+    cache=None,
 ) -> Poller:
     cfg = PollerConfig(
         interval_seconds=interval,
         max_backoff_seconds=max_backoff,
         stale_after_seconds=900,
+        first_retry_seconds=first_retry,
     )
     return Poller(
         providers, cfg, cache if cache is not None else Cache(tmp_path / "cache.json")
@@ -63,8 +69,20 @@ def _poller(
 
 async def test_backoff_exponential_and_capped(tmp_path):
     p = FakeProvider("a", "error")
-    poller = _poller(tmp_path, [p], interval=10, max_backoff=50)
-    for want in (20, 40, 50, 50):  # 10*2、10*4、封顶 50、保持 50
+    poller = _poller(tmp_path, [p], first_retry=10, max_backoff=50)
+    for want in (10, 20, 40, 50, 50):  # 10*1、10*2、10*4、封顶 50、保持 50
+        before = datetime.now(timezone.utc)
+        await poller._fetch_and_schedule(p)
+        delay = (poller._next_due["a"] - before).total_seconds()
+        assert delay == pytest.approx(want, abs=2)
+
+
+async def test_first_retry_backoff(tmp_path):
+    """新退避公式：第 1 次失败等 first_retry_seconds，之后翻倍，封顶 max_backoff。"""
+    p = FakeProvider("a", "error")
+    poller = _poller(tmp_path, [p], first_retry=60, max_backoff=180)
+    # 60（首次 = first_retry_seconds）、120（翻倍）、180（封顶，240 被截断）、180
+    for want in (60, 120, 180, 180):
         before = datetime.now(timezone.utc)
         await poller._fetch_and_schedule(p)
         delay = (poller._next_due["a"] - before).total_seconds()

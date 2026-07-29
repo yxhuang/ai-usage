@@ -25,6 +25,7 @@ class PollerConfig:
     interval_seconds: int = 300
     max_backoff_seconds: int = 1800
     stale_after_seconds: int = 900
+    first_retry_seconds: int = 60
 
 
 @dataclass
@@ -96,6 +97,9 @@ def load_config(path: Path | None = None) -> Config:
     )
     cfg.poller.stale_after_seconds = int(
         poller.get("stale_after_seconds", cfg.poller.stale_after_seconds)
+    )
+    cfg.poller.first_retry_seconds = int(
+        poller.get("first_retry_seconds", cfg.poller.first_retry_seconds)
     )
 
     providers = data.get("providers", {})

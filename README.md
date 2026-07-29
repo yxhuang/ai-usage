@@ -133,7 +133,14 @@ Everything is optional — see [config.example.toml](config.example.toml). Witho
   anything else refuses to start.
 - `providers.claude.proxy` — if you reach Anthropic through a proxy, set it here.
   **You must set it explicitly**: the daemon is a non-interactive process, doesn't read your
-  shell config, and will not inherit proxy environment variables.
+  shell config, and will not inherit proxy environment variables. The reverse does not hold,
+  though: a proxy running in **TUN mode** claims the default route and intercepts at the IP
+  layer, so traffic still goes through it no matter what any provider is configured to do.
+  If a provider suddenly times out while `curl` through the proxy port works, check
+  `ip route get <target ip>` before suspecting the upstream API.
+- `poller.first_retry_seconds` — how long to wait after the *first* failed poll, default
+  `60`. Each further consecutive failure doubles it, capped by `max_backoff_seconds`.
+  Successful polls always use `interval_seconds`.
 - `providers.kimi` — the key falls back through `api_key` → environment variable → key file,
   first hit wins. The key file is parsed with a regex; it is **never** sourced or executed.
 - `providers.codex.command` — the command used to spawn app-server, in case you wrap it.

@@ -13,6 +13,7 @@ port = 8788
 interval_seconds = 300      # 正常轮询间隔
 max_backoff_seconds = 1800  # 失败指数退避上限
 stale_after_seconds = 900   # 缓存数据超过此年龄即视为 stale
+first_retry_seconds = 60    # 首次失败后的重试等待；之后每次翻倍，封顶 max_backoff_seconds
 
 [providers.claude]
 enabled = true

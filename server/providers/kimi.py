@@ -1,7 +1,8 @@
 """Kimi provider：用 sk-kimi-* API key 直连 api.kimi.com。
 
-安全约束：key 只在内存，绝不写日志/异常消息；国内直连，禁止走代理
-（trust_env=False 防止环境变量里的 HTTPS_PROXY 意外生效）。
+安全约束：key 只在内存，绝不写日志/异常消息；不传 proxy，且 trust_env=False
+不读环境变量里的代理设置（HTTP_PROXY/HTTPS_PROXY 等）。注意这不等于流量一定
+没有经过本机代理软件：TUN 模式的代理在 IP 层接管路由，本模块无法感知。
 """
 
 from __future__ import annotations
@@ -78,7 +79,9 @@ class KimiProvider:
                 self.id, self.name, "error", _NO_KEY_MSG.format(env=self._api_key_env)
             )
 
-        # 2. 请求：国内直连，不传 proxy，trust_env=False 防环境变量代理
+        # 2. 请求：不传 proxy，trust_env=False 只保证不读环境变量里的代理
+        #    设置；若本机代理软件开了 TUN 模式（IP 层接管路由），流量仍可能
+        #    被接管，本模块对此无法感知
         client_kwargs: dict = {"timeout": 20.0, "trust_env": False}
         if self._transport is not None:
             client_kwargs["transport"] = self._transport
