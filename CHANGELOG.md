@@ -32,14 +32,35 @@ the logs said why.
 
 ### Fixed
 
+- **Static assets are served with `Cache-Control: no-cache`.** The panel is a long-lived
+  Chrome `--app` window, which serves CSS out of its in-memory cache and does not
+  revalidate on an ordinary reload — so a style change could be live on disk, correct in
+  the HTTP response, and still invisible in the widget until a hard reload. Over loopback
+  there is nothing to gain from caching it.
 - Corrected the `KimiProvider` docstring, which claimed the provider "禁止走代理" on the
   strength of `trust_env=False`. That flag only means environment proxy variables are
   ignored — a proxy running in TUN mode intercepts at the IP layer, where this module has
   no visibility. The network behaviour is unchanged; only the claim was wrong.
 
+- **The pace tick is now lit.** It was a 2px line at `opacity: 0.34`, which made the one
+  element the panel is built around the hardest thing on it to see — and it is meant to be
+  compared against, at a glance, in a small window. It now has an opaque core that
+  overshoots the bar by 2px at each end, a contrast rim so it stays crisp where it crosses
+  the brand-coloured fill, and a two-layer halo that reads as a genuine glow in dark mode
+  and as a lifted shadow in light mode. It stays ink-coloured rather than red: red already
+  means "≥90% used" here, and a second red carrying a different meaning would blunt both.
+  Note that `.bar` deliberately no longer sets `overflow: hidden` — it would clip both the
+  overshoot and the halo. In dark mode the rim is kept deliberately faint: the core is
+  already at maximum contrast there, and a heavy rim sits between core and halo and chokes
+  the glow.
+
 ### Notes
 
 - 69 offline tests, including coverage of the new backoff schedule.
+- `docs/panel-dark.png` retaken with the lit tick. The new shot happens to catch Claude
+  with its 5-hour bar short of the tick and its weekly bar past it — one account, two
+  opposite readings — so the README now opens on that contrast instead of the old
+  "everything has room to spare" shot.
 
 ## [0.2.0] — 2026-07-27
 

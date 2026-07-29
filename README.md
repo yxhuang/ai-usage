@@ -17,23 +17,43 @@ reads all three and puts them in one always-there panel.
 
 <p align="center">
   <img src="docs/panel-dark.png" width="380"
-       alt="The ai-usage panel in dark mode: three cards, one per provider. Claude Pro shows a 5-hour window at 27%, weekly at 48%, and a $22.98/$100 extra-credit pool at 23%. Codex Plus shows weekly at 8%. Kimi shows a 5-hour window at 0% and weekly at 15%. Each bar carries a faint vertical tick marking how much of the time window has elapsed.">
+       alt="The ai-usage panel in dark mode: three cards, one per provider. Claude Pro shows a 5-hour window at 67%, weekly at 22%, and a $22.98/$100 extra-credit pool at 23%. Codex Plus shows weekly at 12%. Kimi shows a 5-hour window at 3% and weekly at 2%. Each bar carries a glowing vertical tick marking how much of the time window has elapsed: Claude's 5-hour bar stops short of its tick, while its weekly bar has crossed it.">
 </p>
 
 > The UI is currently Chinese-only. See [Status](#status).
 
-Every bar above sits to the left of its tick, which means all three have room to spare.
-That tick is the thing worth explaining.
+Look at Claude in that shot. The 5-hour bar stops short of its tick, so there is room to
+keep working. The weekly bar has edged past its own tick, so that budget is running ahead
+of schedule. Same account, same moment, two different answers — and the percentages alone
+(67% and 22%) would have told you the opposite. That tick is the thing worth explaining.
 
 ## The pace tick
 
-That thin vertical line is the whole point. It marks **how much of the time window has
-already elapsed**.
+**This is the feature.** Everything else in this repo is plumbing that exists to draw it.
 
-If your usage bar is to the left of it, you're spending slower than the window refills and
-you can keep going. If the bar crosses it, you're on track to run out early. A plain
-percentage tells you what you spent. The pace tick tells you whether you can keep spending
-it that way — which is the question you actually have at 2pm on a Wednesday.
+That glowing vertical line marks **how much of the time window has already elapsed**. You
+read your usage bar against it:
+
+```
+weekly   ███████████████████░░░░░░░░░░░┃░░░░░░░░░   48% used, 78% of the week gone
+                                                    left of the tick — room to spare
+
+5-hour   █████████████┃██████████░░░░░░░░░░░░░░░░   61% used, 34% of the window gone
+                                                    past the tick — burning it early
+```
+
+Left of the tick, you are spending slower than the window refills and you can keep going.
+Past it, you are on track to run out before the reset — and the further past, the earlier
+you hit the wall.
+
+A plain percentage tells you what you have spent. The pace tick tells you whether you can
+keep spending it that way, which is the question you actually have at 2pm on a Wednesday.
+
+It is drawn as a lit needle that overshoots the bar at both ends, with a contrast rim so it
+stays crisp where it crosses the coloured fill. That is the one loud thing in an otherwise
+restrained panel, on purpose: a marker you have to squint at is a marker you will not use.
+It stays ink-coloured rather than red, because red already means "≥90% used" here and a
+second red with a different meaning would blunt both.
 
 ## What it does not do
 

@@ -16,7 +16,10 @@
   --fill: #5b6ee8;       /* 正常档兜底：冷静的靛蓝（各家用下面的品牌色覆写） */
   --fill-warn: #c98229;  /* ≥70% */
   --fill-danger: #cf4d63;/* ≥90% */
-  --pace: #1b1d23;
+  --pace: #0e1015;                          /* 刻度的芯，比正文再深一点 */
+  --pace-rim: rgba(255, 255, 255, 0.95);    /* 贴身描边：压在品牌色填充上也不糊 */
+  --pace-halo: rgba(14, 16, 21, 0.42);      /* 内层光晕（浅色下是投影，不是发光） */
+  --pace-halo-soft: rgba(14, 16, 21, 0.20); /* 外层光晕，散得更开 */
   --focus: #5b6ee8;
 
   --radius: 10px;
@@ -43,7 +46,13 @@
     --fill: #8b96f2;
     --fill-warn: #dda44f;
     --fill-danger: #e6788c;
-    --pace: #e7e9ee;
+    /* 深色下才是真发光：芯拉到纯白，光晕带一丝冷调，像自己在亮。
+       描边刻意压到很淡——深色下芯与背景本就极限对比，描边太重反而会卡在
+       芯和光晕中间把辉光掐断，只需留一点点压住品牌色填充即可。 */
+    --pace: #ffffff;
+    --pace-rim: rgba(10, 12, 16, 0.45);
+    --pace-halo: rgba(216, 231, 255, 0.62);
+    --pace-halo-soft: rgba(148, 190, 255, 0.34);
     --focus: #8b96f2;
   }
 
@@ -219,12 +228,13 @@ main {
 }
 
 /* 进度条：轨道 + 填充 + 节奏刻度 */
+/* 注意：这里刻意不写 overflow: hidden——节奏刻度要探出条外、还要向外发光，
+   一旦裁剪就全没了。填充自己带满圆角，本来也溢不出去。 */
 .bar {
   position: relative;
   height: 7px;
   border-radius: 999px;
   background: var(--track);
-  overflow: hidden;
 }
 
 .bar-fill {
@@ -242,17 +252,23 @@ main {
   background: var(--fill-danger);
 }
 
-/* 节奏刻度：时间窗口已过去的比例。
-   填充越过它 = 消耗快于额度回补速度。 */
+/* 节奏刻度：时间窗口已过去的比例。填充越过它 = 消耗快于额度回补速度。
+   整个面板唯一一处张扬的地方——它是拿来"对比"的，看不清就没有意义：
+   芯不透明、两端各探出 2px 像卡尺的刻线，三层 box-shadow 从贴身描边散成光晕。
+   颜色仍用墨色而非红色：红在这个面板里已经专指"用量 ≥90%"，
+   再来一个含义不同的红会让信号打架。 */
 .pace {
   position: absolute;
-  top: -1px;
-  bottom: -1px;
+  top: -2px;
+  bottom: -2px;
   width: 2px;
   border-radius: 1px;
   background: var(--pace);
-  opacity: 0.34;
   transform: translateX(-1px);
+  box-shadow:
+    0 0 0 1px var(--pace-rim),
+    0 0 6px 1px var(--pace-halo),
+    0 0 14px 4px var(--pace-halo-soft);
 }
 
 .window-reset {

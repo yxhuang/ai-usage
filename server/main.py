@@ -124,7 +124,15 @@ def create_app(cfg: Config | None = None) -> FastAPI:
             await poller.refresh(None)
         return summary_payload()
 
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+    # 面板是常驻窗口，改完样式要能立刻看见。Chrome 的 --app 窗口会直接吃内存缓存、
+    # 普通刷新都不回源，所以显式要求每次都revalidate——本来就是回环地址，不费什么。
+    class NoCacheStatic(StaticFiles):
+        def file_response(self, *args, **kwargs):
+            resp = super().file_response(*args, **kwargs)
+            resp.headers["Cache-Control"] = "no-cache"
+            return resp
+
+    app.mount("/static", NoCacheStatic(directory=WEB_DIR), name="static")
     return app
 
 
