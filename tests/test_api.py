@@ -274,3 +274,19 @@ def test_hook_put_rejects_bad_headers(make_client, hook_home):
     resp = client.put("/api/vscode-hook", json={"enabled": False})
     assert resp.status_code == 403
     assert not (hook_home / "config" / "ai-usage").exists()
+
+
+def test_index_is_not_cacheable(make_client):
+    """回归：index.html 被缓存住、脚本却更新了，新脚本会对着旧 DOM 白屏。"""
+    client = make_client(_three_providers())
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert resp.headers.get("cache-control") == "no-cache"
+
+
+def test_static_assets_are_not_cacheable(make_client):
+    client = make_client(_three_providers())
+    for path in ("/static/app.js", "/static/index.html"):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        assert resp.headers.get("cache-control") == "no-cache", path

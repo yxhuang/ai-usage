@@ -329,20 +329,30 @@ async function setHook(enabled) {
   }
 }
 
-document.getElementById("settings-toggle").addEventListener("click", (e) => {
-  const body = document.getElementById("settings-body");
-  const open = body.hidden;
-  body.hidden = !open;
-  e.currentTarget.setAttribute("aria-expanded", String(open));
-  if (open) loadHook();
-  fitWindowToContent(); // 展开/收起会改变内容高度
-});
-
-document.getElementById("hook-switch").addEventListener("change", (e) => {
-  setHook(e.currentTarget.checked);
-});
-
+/* 主功能先接线、先取数，设置区放最后：万一页面是缓存里的旧版本、缺了设置区的元素，
+ * 也只是没有设置区可用，不该把整个面板一起拖垮。
+ * （之前就这么白过一次屏：设置区接线抛异常，loadSummary 根本没跑到。） */
 document.getElementById("refresh-btn").addEventListener("click", refreshAll);
 loadSummary();
 setInterval(loadSummary, 60000);
 setInterval(repaint, 30000);
+
+function wireSettings() {
+  const toggle = document.getElementById("settings-toggle");
+  const body = document.getElementById("settings-body");
+  const box = document.getElementById("hook-switch");
+  const note = document.getElementById("hook-note");
+  if (!toggle || !body || !box || !note) return; // 旧页面，静默跳过
+
+  toggle.addEventListener("click", () => {
+    const open = body.hidden;
+    body.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) loadHook();
+    fitWindowToContent(); // 展开/收起会改变内容高度
+  });
+
+  box.addEventListener("change", (e) => setHook(e.currentTarget.checked));
+}
+
+wireSettings();

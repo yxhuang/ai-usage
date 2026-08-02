@@ -248,7 +248,7 @@ Everything is optional — see [config.example.toml](config.example.toml). Witho
 ## Development
 
 ```bash
-uv run pytest      # 115 tests; no network, no real credentials
+uv run pytest      # 117 tests; no network, no real credentials
 ```
 
 Tests build responses and fake credentials with `httpx.MockTransport` and temp directories.
@@ -259,7 +259,7 @@ a real credential.
 
 ## Status
 
-Early, and honest about it. The logic is covered by 115 offline tests, but it has only run on
+Early, and honest about it. The logic is covered by 117 offline tests, but it has only run on
 one machine so far. If a provider's response shape differs on your account — a different
 plan tier, a different region — a bug report with the (redacted) payload would genuinely
 help.

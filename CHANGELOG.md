@@ -80,6 +80,13 @@ the logs said why.
 
 ### Fixed
 
+- **`/` (index.html) is served with `Cache-Control: no-cache` too.** Only `/static` had it;
+  the page itself, the one entry point that matters most, was missed. Adding the settings
+  section made that fatal: the browser reused the cached HTML while loading the fresh
+  `app.js`, the new script could not find the settings elements in the old DOM, and the
+  resulting exception happened *before* `loadSummary()` — so not a single card rendered.
+  The script was hardened as well: the main panel is wired and fetched first, settings last
+  and null-guarded, so a stale page costs you the settings section and nothing else.
 - **Static assets are served with `Cache-Control: no-cache`.** The panel is a long-lived
   Chrome `--app` window, which serves CSS out of its in-memory cache and does not
   revalidate on an ordinary reload — so a style change could be live on disk, correct in
@@ -104,7 +111,7 @@ the logs said why.
 
 ### Notes
 
-- 115 offline tests (up from 87), including coverage of the new backoff schedule, the
+- 117 offline tests (up from 87), including coverage of the new backoff schedule, the
   proxy semantics (normalization, env-var isolation, subprocess environment scrubbing),
   config-source resolution, and the strict `--config` semantics.
 - A cross-platform login-autostart toggle was designed in full and then **dropped before

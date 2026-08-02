@@ -108,7 +108,12 @@ def create_app(
 
     @app.get("/")
     async def index():
-        return FileResponse(WEB_DIR / "index.html")
+        # index.html 也必须 no-cache。它和 /static 下的资源是一起演进的：
+        # 页面被缓存住、脚本却更新了，新脚本就会对着旧 DOM 找不到元素。
+        # （曾经真的这样白过屏：/static 早有 no-cache，唯独漏了这一个入口。）
+        return FileResponse(
+            WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"}
+        )
 
     @app.get("/api/summary")
     async def get_summary():
