@@ -9,7 +9,7 @@
 
 **Three AI subscriptions. One small window. Know before you hit the wall.**
 
-English | [简体中文](docs/README.zh-CN.md)
+English | [简体中文](docs/README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
 If you pay for Claude Pro, ChatGPT Plus, and a Kimi plan, your quota lives in three
 places and none of them tell you anything until you're already rate-limited. `ai-usage`
@@ -72,13 +72,19 @@ does not consume a single token of your quota.
 ```bash
 git clone https://github.com/yxhuang/ai-usage && cd ai-usage
 uv sync
-uv run python -m server.main     # open http://127.0.0.1:8788
+uv run python -m server.launch   # open http://127.0.0.1:8788
 ```
 
 That's it — no config file needed. Every provider that isn't logged in simply shows an
 error card while the others keep working.
 
-To keep it running in the background (systemd user unit, starts at boot):
+Config file somewhere else? Pass `--config`:
+
+```bash
+uv run python -m server.launch --config ~/.config/ai-usage/config.toml
+```
+
+To keep it running in the background (Linux, systemd user unit):
 
 ```bash
 bash deploy/install.sh
@@ -138,6 +144,49 @@ is a hack. It has to stay resident, and a major Chrome release that changes the 
 structure could break it. The title bar can't be removed at all (Chrome draws its own) —
 which turned out to be a feature, since without it the window can't be dragged.
 
+## Start with your editor
+
+There is deliberately no boot autostart. You are not necessarily working when the machine
+boots; you almost certainly are when you open an editor. So that is the trigger: opening
+VS Code brings the panel out, closing it is left alone.
+
+[`deploy/vscode-hook.sh`](deploy/vscode-hook.sh) does three things — check the switch,
+make sure the daemon is up (starting it if not), open the panel window. Calling it again
+does not open a second window.
+
+The switch applies to every setup below:
+
+```bash
+deploy/vscode-hook.sh --status     # where things stand
+deploy/vscode-hook.sh --disable    # off; later hook calls just exit
+deploy/vscode-hook.sh --enable     # back on
+```
+
+The state *is* a flag file at `~/.config/ai-usage/vscode-hook.disabled` — delete it and the
+hook is on again. Nothing else is written to your system.
+
+**WSL + VS Code Remote.** Remote-WSL sources `~/.vscode-server/server-env-setup` before
+starting its server, so add this there:
+
+```sh
+if [ -x ~/ai-usage/deploy/vscode-hook.sh ]; then
+    setsid ~/ai-usage/deploy/vscode-hook.sh </dev/null >/dev/null 2>&1 &
+fi
+```
+
+`setsid` is not optional. That file is *sourced*, so without detaching, the hook would hold
+up VS Code's startup and get killed along with it on exit.
+
+**Anywhere else.** VS Code has no official local startup hook; use an extension that can run
+a command on startup, or skip the hook entirely and open the shortcut from the previous
+section by hand. That is a perfectly normal way to use this — you just lose the "appears on
+its own" part.
+
+If login autostart is what you actually want, every OS already has it: drop the shortcut in
+`shell:startup` on Windows, add it to Login Items on macOS, or use the systemd unit from
+`deploy/install.sh` on Linux. This project does not wrap another layer around those;
+[the reasoning is archived here](docs/specs/2026-08-02-autostart-design.md).
+
 ## Where the numbers come from
 
 | Provider | How | Notes |
@@ -196,7 +245,7 @@ Everything is optional — see [config.example.toml](config.example.toml). Witho
 ## Development
 
 ```bash
-uv run pytest      # 87 tests; no network, no real credentials
+uv run pytest      # 100 tests; no network, no real credentials
 ```
 
 Tests build responses and fake credentials with `httpx.MockTransport` and temp directories.
@@ -207,7 +256,7 @@ a real credential.
 
 ## Status
 
-Early, and honest about it. The logic is covered by 87 offline tests, but it has only run on
+Early, and honest about it. The logic is covered by 100 offline tests, but it has only run on
 one machine so far. If a provider's response shape differs on your account — a different
 plan tier, a different region — a bug report with the (redacted) payload would genuinely
 help.

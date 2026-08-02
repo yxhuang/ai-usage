@@ -1,6 +1,6 @@
 [project]
 name = "ai-usage"
-version = "0.2.0"
+version = "0.3.0"
 description = "本地 AI 订阅额度面板：Claude / Codex / Kimi"
 requires-python = ">=3.11"
 dependencies = [

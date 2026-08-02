@@ -1,17 +1,36 @@
 # Changelog
 
+English | [简体中文](docs/CHANGELOG.zh-CN.md) · [back to README](README.md)
+
 All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version stays below 1.0.0, minor bumps may change behaviour.
 
-## [Unreleased]
+## [0.3.0] — 2026-08-02
 
 Fallout from a real incident: a proxy's TUN mode was switched on without the user noticing,
 it took over the default route, and the Kimi provider timed out for hours. The provider
 itself was fine — but recovering from it took far longer than it should have, and nothing in
 the logs said why.
+
+### Added
+
+- **`python -m server.launch`, with a `--config <path>` option.** An explicitly given path
+  is strict: a missing file, a non-regular or unreadable file, or a TOML parse error exits
+  non-zero rather than silently falling back to the built-in defaults. Without `--config`
+  it behaves exactly like the old `python -m server.main`.
+- **Start-with-your-editor, with a switch** ([`deploy/vscode-hook.sh`](deploy/vscode-hook.sh)).
+  Opening VS Code makes sure the daemon is up and brings the panel window out; closing the
+  editor is left alone. `--enable` / `--disable` / `--status` control it, and the state *is*
+  a flag file at `~/.config/ai-usage/vscode-hook.disabled` — nothing else is written to your
+  system. Calling it repeatedly does not open a second window.
+
+  There is deliberately no login/boot autostart. You are not necessarily working when the
+  machine boots; you almost certainly are when you open an editor. If you do want it at
+  login, each OS already has a mechanism for that (`shell:startup`, Login Items, a systemd
+  unit) and wrapping another layer around them was not worth it.
 
 ### Changed
 
@@ -43,6 +62,8 @@ the logs said why.
   default log configuration. During the incident above, twelve hours of consecutive
   timeouts produced not one line in `journalctl`. The message still carries only the
   provider id and status: error text can contain URLs or credential fragments.
+- **Importing `server.main` no longer has side effects.** It used to build the app at
+  module level (`app = create_app()`); that now lives inside `main()`.
 - **Error and auth-expired cards now say when the last attempt was** ("最后尝试 3 分钟前").
   Previously only `stale` cards carried a timestamp, so a failed card gave no hint whether
   it was one minute or one afternoon old. Worth noting the wording differs from the stale
@@ -74,8 +95,19 @@ the logs said why.
 
 ### Notes
 
-- 87 offline tests, including coverage of the new backoff schedule and the proxy
-  semantics (normalization, env-var isolation, subprocess environment scrubbing).
+- 100 offline tests (up from 87), including coverage of the new backoff schedule, the
+  proxy semantics (normalization, env-var isolation, subprocess environment scrubbing),
+  config-source resolution, and the strict `--config` semantics.
+- A cross-platform login-autostart toggle was designed in full and then **dropped before
+  implementation**; the spec is kept as an archive at
+  [`docs/specs/2026-08-02-autostart-design.md`](docs/specs/2026-08-02-autostart-design.md).
+  The complexity was out of proportion to the payoff: "touch nothing unless enabled" plus
+  "always fully reversible", across four different startup mechanisms, needs ownership
+  markers, conflict detection, a cross-process lock and step-wise compensation to hold up —
+  and the thing it delivers was never what this project wanted. The archive records several
+  verified facts worth reusing if it is ever revisited.
+- The Chinese README was rewritten, and a Chinese changelog added
+  ([docs/CHANGELOG.zh-CN.md](docs/CHANGELOG.zh-CN.md)).
 - `docs/panel-dark.png` retaken with the lit tick. The new shot happens to catch Claude
   with its 5-hour bar short of the tick and its weekly bar past it — one account, two
   opposite readings — so the README now opens on that contrast instead of the old
@@ -157,6 +189,6 @@ First public release: one panel for Claude, Codex and Kimi subscription quotas.
   launching through a VBS wrapper so no console window flashes.
 - 68 offline tests, MIT licence, CI, and a bilingual README.
 
-[Unreleased]: https://github.com/yxhuang/ai-usage/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/yxhuang/ai-usage/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yxhuang/ai-usage/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yxhuang/ai-usage/releases/tag/v0.1.0
