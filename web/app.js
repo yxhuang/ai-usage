@@ -227,6 +227,10 @@ let fitAttempts = 0;
 
 function fitWindowToContent() {
   if (fitAttempts >= 3) return; // 防止和浏览器的尺寸约束来回拉锯
+  // 设置视图比卡片短得多。开着设置时后台那轮 60 秒刷新会把窗口缩掉，
+  // 切回卡片就再也长不回来（次数用完了）。开着设置就不量。
+  const panel = document.getElementById("settings");
+  if (panel && !panel.hidden) return;
   try {
     const chrome = window.outerHeight - window.innerHeight; // 标题栏 + 边框
     const needed = document.body.offsetHeight; // 含 padding，且不受滚动位置影响
@@ -338,12 +342,24 @@ setInterval(loadSummary, 60000);
 setInterval(repaint, 30000);
 
 function wireSettings() {
+  const btn = document.getElementById("settings-btn");
+  const panel = document.getElementById("settings");
+  const cards = document.getElementById("cards");
   const box = document.getElementById("hook-switch");
   const note = document.getElementById("hook-note");
-  if (!box || !note) return; // 旧页面，静默跳过
+  if (!btn || !panel || !cards || !box || !note) return; // 旧页面，静默跳过
+
+  btn.addEventListener("click", () => {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    cards.hidden = open; // 互斥：设置开着就不显示卡片
+    btn.setAttribute("aria-expanded", String(open));
+    btn.classList.toggle("active", open);
+    if (open) loadHook();
+    // 故意不 resize：设置视图比卡片短，缩窗之后切回来未必长得回去
+  });
 
   box.addEventListener("change", (e) => setHook(e.currentTarget.checked));
-  loadHook();
 }
 
 wireSettings();

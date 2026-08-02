@@ -25,9 +25,10 @@ the logs said why.
   Opening VS Code makes sure the daemon is up and brings the panel window out; closing the
   editor is left alone. Calling it repeatedly does not open a second window.
 
-  The toggle sits at the bottom of the panel under a divider — not behind a disclosure,
-  because a single setting hidden behind a "Settings" link is a setting nobody finds. If the
-  hook isn't installed the panel says so instead of offering a control that does nothing.
+  The toggle lives behind the gear left of the title. Settings are a *view* that replaces the
+  cards rather than a section below them — appended at the bottom, they fall outside a small
+  window as soon as the cards fill it. If the hook isn't installed the panel says so instead
+  of offering a control that does nothing.
   `--enable` / `--disable` / `--status` read and write the same state, which *is* a flag file
   at `~/.config/ai-usage/vscode-hook.disabled` — nothing else is written to your system.
   Delete the file by hand and the panel reflects that on its next read.
