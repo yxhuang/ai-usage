@@ -1,4 +1,4 @@
-# 自启动开关设计（v4）
+# 自启动开关设计（v5）
 
 2026-08-02
 
@@ -7,17 +7,23 @@
 > | 版本 | 评审结论 | 主要问题 |
 > |---|---|---|
 > | v1 | 需修改后开工 | 3 阻断 + 10 重要 + 1 范围 |
-> | v2 | 需修改后开工 | 5 项真正解决；新增 3 阻断，其中 2 项是 v2 自己引入的**内部矛盾** |
+> | v2 | 需修改后开工 | 新增 3 阻断，其中 2 项是 v2 自己引入的**内部矛盾** |
 > | v3 | 需修改后开工 | 4 阻断：归属认定、状态模型、补偿顺序、配置快照在半数平台无处可放 |
-> | v4 | 本文 | 见文末〈评审项处置对照〉 |
+> | v4 | 需修改后开工 | 3 处**契约断口**（评审语：「完成这三处后即可开工」） |
+> | v5 | 本文 | 补齐三处断口，见文末〈评审项处置对照〉 |
 >
-> **v3 被推翻的两处**（都是自相矛盾，不是外部意见）：
-> 1. §1.2 要求 artifact 内容与「当前会生成的」完全一致才算 `owned`，但 §3 又说
->    「解释器不存在 → `owned_stale`」——解释器一没，内容就对不上，只会被判成 `foreign`，
->    永远进不了 `owned_stale`。**归属与新鲜度必须分开判定。**
-> 2. §4 要求把 `AI_USAGE_CONFIG` 快照进 artifact，但 XDG 的 `.desktop` 与 Windows 的
->    `.lnk` **都没有附加环境变量的槽位**（`Exec` 只有程序和参数；`.lnk` 只有
->    TargetPath/Arguments/WorkingDirectory）。四个 backend 里有两个做不到。
+> **v4 被指出的三处断口**（都是我留下的缺口，不是方向问题）：
+> 1. **`can_disable` 关不掉**。它只认「存在 owned 文件」，转移表却要求「文件已删、
+>    systemd 注册残留」时仍能关——于是存在 `enabled=True` 却 `can_disable=False` 的
+>    死角，违反硬约束。v5 把**注册关系本身也建模成 artifact**，两处用同一判据。
+> 2. **配置来源丢失**。`create_app()` 只收 `Config`，路径在解析时就没了，`enable()` 无从
+>    知道该快照哪份配置。v5 引入 `ConfigSource`，并明确 strict 语义**不改动**
+>    `load_config()` 的既有契约（`tests/test_config.py:11` 依赖它）。
+> 3. **说了「disable 需要自己的一张表」然后没写那张表**。v5 补上，含
+>    「先 disable 再删文件」的顺序理由。
+>
+> 另修掉一处 v4 自己引入的矛盾：§3 曾把「plist 已删、job 仍在 launchd」当成必须清理的
+> 注册残留，与 §4「阶段一不 bootout」直接冲突。残留注册**只指 systemd**。
 >
 > 前置依赖已完成：公版默认值改造（`2026-08-02-public-defaults-design.md`，`da153ff`）。
 
@@ -72,20 +78,66 @@
 <python> -m server.launch [--config <abs path>]
 ```
 
-要求：
+### 〇.1 `ConfigSource`：配置路径必须一路传下去
 
-1. **strict 语义**。给了 `--config` 就必须能用：路径不存在、不是普通可读文件、解析失败
-   → 打印原因并**非零退出**。**不得回落默认配置**。
-   （现有 `load_config()` 在显式路径消失时会静默返回默认值，那对交互式使用无所谓，
-   对一个每次登录自动跑的进程是静默的行为漂移。）
-2. 路径在 `enable()` 时就绝对化，artifact 里只存绝对路径。
-3. 不给 `--config` 时行为与今天的 `python -m server.main` 一致。
-4. 配置必须在建 app **之前**确定。
+光有 `--config` 还不够。`enable()` 需要知道**当前这个进程实际用的是哪份配置**才能快照，
+而现在 `create_app()` 只收到一个 `Config` 对象，路径信息在解析时就丢了。
+从 `--config` 启动时也不能再回头读 `AI_USAGE_CONFIG`（那是另一条来源）。
+
+新增一个显式的来源对象，从入口一路传给 app 和 autostart backend：
+
+```python
+@dataclass(frozen=True)
+class ConfigSource:
+    path: Path | None      # 绝对路径；None 表示没有配置文件
+    origin: str            # cli | env | repo_default | builtin
+```
+
+**解析优先级**（`server/launch.py` 负责，唯一一处）：
+
+| 顺序 | 来源 | `origin` |
+|---|---|---|
+| 1 | `--config <path>` | `cli` |
+| 2 | 环境变量 `AI_USAGE_CONFIG` | `env` |
+| 3 | 仓库根的 `config.toml`（存在时） | `repo_default` |
+| 4 | 内置默认，无文件 | `builtin` |
+
+`create_app()` 签名扩展为 `create_app(cfg=None, source=None)`——`source` 可选，
+现有调用方（`tests/test_api.py` 的 `create_app(cfg)`）不受影响。
+
+**`enable()` 的快照规则**由 `origin` 决定：
+
+- `cli` / `env` → artifact 里写 `--config <绝对路径>`（这是用户的显式选择，必须固化）
+- `repo_default` / `builtin` → **不写 `--config`**。artifact 已经设了工作目录为项目根，
+  下次登录会解析到同一份 `config.toml`，写死反而在用户日后删掉该文件时变成硬错误。
+
+### 〇.2 strict 语义只加在入口，不改 `load_config()`
+
+现有 `load_config(path)` 对显式传入但不存在的路径返回默认配置，
+**`tests/test_config.py:11` 正依赖这个行为**。不得改动它的既有语义。
+
+做法：`load_config()` 增加 `strict: bool = False` 参数，默认关闭；
+`server/launch.py` 在 `origin in {cli, env}` 时传 `strict=True`。strict 下：
+路径不存在、不是普通可读文件、TOML 解析失败 → 打印原因并**非零退出**，
+**不得回落默认配置**。
+
+理由：交互式使用时静默回落无所谓；一个每次登录自动跑的进程静默换配置（可能是换端口）
+是行为漂移。
+
+其余要求：路径在 `enable()` 时就绝对化，artifact 里只存绝对路径；
+不给 `--config` 时行为与今天的 `python -m server.main` 一致；配置必须在建 app **之前**确定。
 
 配套小改动：`server/main.py` 现在有模块级 `app = create_app()`，导入即建应用。
-已确认全仓库**没有任何地方**以 `server.main:app` 形式引用它（只有 `create_app()` 与
-`python -m server.main`），因此把它移进 `main()` 是安全的，也让 `server.launch` 能干净地
-先定配置再建 app。
+已确认全仓库**没有任何地方**以 `server.main:app` 形式引用它——`tests/test_api.py:13` 只导入
+模块再调 `create_app()`，`tests/test_config.py` 只用 `load_config()` 和 `build_providers()`
+——因此把它移进 `main()` 是安全的。迁移后必须是
+
+```python
+cfg, source = resolve_config(...)
+uvicorn.run(create_app(cfg, source), ...)
+```
+
+**不得再隐式加载一次配置**。
 
 **秘密不进 artifact**：只存配置文件路径，绝不把 `KIMI_API_KEY` 之类的值写进 artifact
 （`.desktop`/`.lnk` 往往是 world-readable）。若用户的配置依赖当前 shell 里的秘密环境变量，
@@ -226,15 +278,21 @@ systemctl --user daemon-reload
 v2 用八值枚举，既不完备也不互斥。v3 拆成正交字段，但仍是**单值**，而 §1.3 明确允许多个
 artifact 并存。v4 改成**每个 artifact 一条记录**：
 
+**注册关系本身也是一条 artifact。** 这是 v4 漏掉的：systemd 的 enable symlink 可以在
+unit 文件被删之后残留，此时「文件不存在」但「下次登录仍会尝试启动」。把它建模成独立
+artifact，`can_disable` 才能覆盖到它。
+
 ```python
 @dataclass
 class ArtifactStatus:
-    kind: str                        # systemd | xdg | launchd | windows | legacy_unit
+    kind: str                        # systemd_unit | systemd_registration | xdg_desktop
+                                     # | launchd_plist | windows_lnk | legacy_unit
     path: str
     ownership: str                   # absent | owned | foreign
     freshness: str                   # current | stale | unknown   （仅 owned 有意义）
     configured_for_next_login: bool | None   # None = 查不出
     active_now: bool | None
+    installation_state: str | None   # systemd 的原始 UnitFileState，原样保留供 UI 与排障
     detail: str | None
 
 @dataclass
@@ -272,8 +330,26 @@ v3 写成「查询失败即 None」是错的：一个机制已确认会启动、
 Windows 上 `pythonw.exe` 事后消失会让 `supported=False`，遗留的 `.lnk` 就再也清理不掉了。
 
 - `can_enable`：需要平台受支持、无 foreign/legacy 冲突、目标解释器可用
-- `can_disable`：**只要存在任何一条 `ownership == owned` 的 artifact 就为真**，
+- `can_disable`：**只要存在任何一条 `ownership == owned` 的 artifact 就为真**——
+  **包括 `kind == "systemd_registration"` 的残留注册**，即使对应的 unit 文件已经不在。
   与 `supported`、冲突、解释器是否还在**全部无关**。清理自己写的东西永远被允许。
+
+  v4 在这里自相矛盾：`can_disable` 只认文件，转移表却要求「文件 absent + 残留注册」时
+  仍能 disable，于是会出现 `enabled=True` 却 `can_disable=False` 的关不掉状态。
+  把注册关系建模成 artifact 之后，两处用的是同一个判据，矛盾消失。
+
+### `managed_by` 只是 UI 简写
+
+单值表达不了 `owned + foreign`、`owned + legacy` 并存。**完整信息永远在 `artifacts` 里**，
+`managed_by` 只按固定优先级派生，供界面一句话概括：
+
+```
+存在 owned 且 configured_for_next_login=True        → "panel"
+否则 存在 legacy_confirmed 且会自启                  → "legacy_confirmed"
+否则 存在 foreign/other 且会自启                     → "other"
+否则 有 None 挡住判定                                → "unknown"
+否则                                                 → "none"
+```
 
 ### freshness 与 probe
 
@@ -294,25 +370,51 @@ Windows 上 `pythonw.exe` 事后消失会让 `supported=False`，遗留的 `.lnk
 - **超时 ≠ 失败**：超时或无法执行 → `freshness = "unknown"`；
   探针明确报错（导入失败、配置解析失败）→ `freshness = "stale"`
 
+⚠️ **调用方式必须写死，不能写成 `python -I -B -m server.probe`**：本项目
+`pyproject.toml` 是 `package = false`，`server` 不会被装进 site-packages；
+而 `-I` 会把 cwd 从 `sys.path` 里摘掉——两者叠加，隔离模式下必然 `ModuleNotFoundError`。
+
+正确形式是固定的 `-c` bootstrap，项目根与配置路径经 **argv 传入**（不得插值进代码字符串）：
+
+```
+<python> -I -B -c "<固定 bootstrap>" <project_root> [<config_path>]
+```
+
+bootstrap 自己 `sys.path.insert(0, sys.argv[1])` 之后再导入 `server.config` 并
+`load_config(sys.argv[2], strict=True)`，成功打印约定字样、失败非零退出。
+
 `status()` **任何情况下不抛异常**，查询失败进 `query_errors`，其余维度照常返回。
 
 ### 状态 × 动作转移表
 
 「覆盖自己的 artifact 是安全的」（marker 已证明归属），no-op 只适用于「已经正确开着」。
 
-| ownership | configured_for_next_login | `enable()` | `disable()` |
-|---|---|---|---|
-| `absent` | — | 写入 + 注册 | **不是无条件 no-op**：先复查注册状态，有残留注册就清掉（见下） |
-| `owned` | `True` 且 `freshness=current` | no-op | 注销 + 删除 |
-| `owned` | `False` | 重新注册 | 删除 + 清注册 |
-| `owned` | `None` | 重写 + 重新注册，之后**如实复查**并写 `issues` | 注销 + 删除 |
-| `owned` | 任意，`freshness` 为 `stale`/`unknown` | **重写 + 重新注册**（修复路径） | 注销 + 删除 |
-| `foreign` | 任意 | 拒绝 | 拒绝，不动它 |
-| `legacy_confirmed`/`other` | 任意 | 拒绝，给 §1.4 的说明 | 不适用（不是本功能的东西） |
+表按 (`kind`, `ownership`) 分派——`legacy_confirmed` / `other` 不是 ownership 取值，
+它们是 `kind == "legacy_unit"` 的两种确信程度（§1.4）。
 
-`absent` 时 `disable()` 不能无脑 no-op：macOS 上完全可能出现「plist 已删、job 仍在
-launchd 里注册」，systemd 上也可能「文件已删、enable symlink 还在」。`disable()` 必须
-把注册关系也查一遍并清理干净，才算真的恢复了。
+| kind | ownership | configured_for_next_login | `enable()` | `disable()` |
+|---|---|---|---|---|
+| 主 artifact | `absent` | — | 写入 + 注册 | 见下方「残留注册」一行 |
+| 主 artifact | `owned` | `True` 且 `freshness=current` | no-op | 注销 + 删除 |
+| 主 artifact | `owned` | `False` | 重新注册 | 删除 + 清注册 |
+| 主 artifact | `owned` | `None` | 重写 + 重新注册，之后**如实复查**并写 `issues` | 注销 + 删除 |
+| 主 artifact | `owned` | 任意，`freshness` 为 `stale`/`unknown` | **重写 + 重新注册**（修复路径） | 注销 + 删除 |
+| 主 artifact | `foreign` | 任意 | 拒绝 | 拒绝，不动它 |
+| `systemd_registration` | `owned`（symlink 指向我们的 unit 名） | — | 归入上面的「重新注册」 | **清理该 symlink + `daemon-reload`** |
+| `legacy_unit` | — | 任意 | 拒绝，给 §1.4 的说明 | 不适用（不是本功能的东西） |
+
+**「残留注册」只指 systemd。** systemd 的 enable symlink 独立于 unit 文件存在，unit 删了
+symlink 可能还在（`daemon-reload` 失败时就会这样），此时下次登录仍会尝试启动，
+所以必须清。判定安全的条件：symlink 的目标文件名正是 `ai-usage-autostart.service`
+（即指向我们的名字），且它位于用户 unit 目录下的 `.wants` 里。
+
+**launchd 不属于这一类**——v4 曾把「plist 已删、job 仍在 launchd 里」也写成必须清理的
+残留，与 §4「阶段一不 bootout」直接冲突。正确理解是：已加载的 job 只表示
+**`active_now`**（本次会话还在跑），它不构成「下次登录仍登记」——下次登录 launchd 读的是
+`~/Library/LaunchAgents` 目录，plist 没了就不会再起。阶段一**不 bootout**，
+只在 UI 上说明「当前实例会运行到你注销」。
+
+Windows 的 `.lnk` 同理：没有独立于文件的注册关系，删了就是删了。
 
 「被系统禁用」（macOS 登录项、Windows 任务管理器）是**系统级用户意图**，重写 artifact
 不一定能解除，所以上表要求「重写后如实复查」，不能假装修好了。
@@ -434,9 +536,19 @@ v4 的承诺是「尽力恢复 + 如实上报」，并把恢复顺序写死。
 
 ### 6.1 锁
 
-**身份**：每用户一把，**跨 checkout、跨 backend 共用同一个身份**（否则两份 checkout 各锁
-各的，照样能同时写出两个 unit）。锁文件放运行时目录（Unix 优先
-`$XDG_RUNTIME_DIR`，回落到用户私有的固定路径），Windows 用具名互斥体。
+**身份必须写死**，否则 Python、shell、不同 checkout 未必真的取到同一把锁：
+
+| 平台 | 锁 |
+|---|---|
+| Unix | `${XDG_RUNTIME_DIR:-/tmp/ai-usage-<uid>}/ai-usage-autostart.lock` |
+| Windows | 具名互斥体 `Local\ai-usage-autostart` |
+
+- `$XDG_RUNTIME_DIR` 未设置时回落到 `/tmp/ai-usage-<uid>`，该目录须由本用户拥有、权限 `0700`；
+  已存在但属主或权限不对 → 拒绝操作并报错，不将就
+- 协议：`fcntl.flock(fd, LOCK_EX | LOCK_NB)`，**持住 fd 直到操作结束**。
+  `install.sh` 用 `flock(1)` 锁**同一路径**（`flock -n <path> -c ...`），两边才是同一把锁
+- 路径里**不含 checkout 信息**——每用户一把，跨 checkout、跨 backend 共用（否则两份
+  checkout 各锁各的，照样能同时写出两个 unit）
 
 **规则**：
 
@@ -467,9 +579,25 @@ v4 的承诺是「尽力恢复 + 如实上报」，并把恢复顺序写死。
 3. `daemon-reload`（让 systemd 内存与磁盘一致，必须排在恢复文件**之后**）
 4. 恢复原注册状态并复查
 
-**disable 需要自己的一张表，不能复用 enable 的**。典型失败：「文件删成功、
-`daemon-reload` 失败」——下次 `disable()` 看到 `absent` 若直接 no-op 就永远收不了尾。
-这正是 §3 转移表要求 `absent` 时仍复查注册关系的原因。
+**disable（systemd）** 的表，顺序与 enable **相反**：
+
+| 步骤 | 前向 | 失败时怎么办 |
+|---|---|---|
+| ① | 快照文件内容+元数据+注册状态 | — |
+| ② | `systemctl --user disable`（撤注册） | 状态尚未改变，直接返回错误，无需补偿 |
+| ③ | 删除 unit 文件 | **重新 `enable` 恢复原注册**，回到操作前状态 |
+| ④ | `daemon-reload` | **不回滚**——文件已删就是目标状态，回滚反而更糟。写 `issues` 并返回可重试 |
+| ⑤ | 复查 `.wants` 里是否还有指向我们的 symlink，有则清理 + 再 `daemon-reload` | 写 `issues`，返回 `recovery_required` |
+
+⚠️ ② 必须在 ③ **之前**：`systemctl disable` 需要 unit 文件在场才能解析 `[Install]` 并正确
+移除 symlink。文件先删了再 disable，symlink 就可能留下来——这正是 ⑤ 存在的原因，
+也是 §3 把残留注册单独建模的原因。
+
+④ 失败后是「文件已删、systemd 内存里还有旧 unit」的半成品状态。下次 `disable()` 会看到
+`absent` + 可能的残留注册，按 §3 转移表继续收尾——**所以 `absent` 不能无脑 no-op**。
+
+其余 backend 的 disable 只有「删文件」一步（launchd 不 bootout、Windows 无独立注册），
+失败即恢复备份。
 
 其余 backend（launchd / XDG / Windows）只有「备份 → 原子写入」两步，补偿即「恢复备份 /
 删除新文件」；Windows 多一步「写临时 `.lnk` → 读回校验 → `os.replace`」。
@@ -600,8 +728,8 @@ X-Frame-Options: DENY
   （这是 v3 的自相矛盾，必须有回归测试）
 - 同名但 `project_root` 指向另一个 checkout → `foreign`，拒绝操作
 - artifact 内容被人手改过（与 marker 快照不符）→ `foreign`
-- `legacy_confirmed` 四条件逐一破坏（FragmentPath 不符 / symlink / 有 DropInPaths /
-  WorkingDirectory 不符）→ 降级为 `other`，且提示里**不含 `rm`**
+- `legacy_confirmed` 五条件逐一破坏（FragmentPath 不符 / symlink / 有 DropInPaths /
+  WorkingDirectory 不符 / **`ExecStart` 不符**）→ 降级为 `other`，且提示里**不含 `rm`**
 - 迁移提示里的路径来自实际 `FragmentPath`，不是硬编码的 `~/.config/...`
 - systemd 与 XDG artifact **同时存在** → `artifacts` 有两条
 - owned + foreign 并存 → `can_enable=False` 但 **`can_disable=True`**，且 disable 只删 owned
@@ -613,7 +741,11 @@ X-Frame-Options: DENY
 **状态与转移**
 - 各 backend 的 `absent → owned → absent` 全循环
 - `enabled` 三值 OR：一个 True + 一个查询失败 → **True**（不是 None）
-- `absent` + 残留注册关系 → `disable()` 清理注册，不是 no-op
+- systemd unit 文件 absent + `.wants` 里残留指向我们的 symlink → 出现一条
+  `kind="systemd_registration"`、`ownership="owned"` 的 artifact，
+  **`can_disable=True`**，`disable()` 清掉 symlink 并 `daemon-reload`
+- macOS plist absent 但 job 仍在 launchd 中 → 只体现为 `active_now=True`，
+  **不产生残留注册 artifact**、**不 bootout**（这是 v4 的自相矛盾，须有回归测试）
 - `stale` / `configured=None` → `enable()` 确实执行重写（**不是 no-op**）
 - XDG `Hidden=true`、无效 `TryExec` → 不会运行；`OnlyShowIn`/`NotShowIn` 结合
   `$XDG_CURRENT_DESKTOP` 计算，两种结果都要测
@@ -621,6 +753,8 @@ X-Frame-Options: DENY
   `configured_for_next_login` 仍为 `None`（无法调授权 API 时）
 
 **probe**
+- **happy path**：配置正常 → `freshness="current"`（这条最容易漏，且能挡住
+  「probe 在 `-I` 下必然失败」这类实现错误）
 - probe 以 `-I -B` 运行，不产生 pyc
 - probe 超时 → `freshness="unknown"`（**不是 stale**），且子进程被清理
 - probe 明确报错（导入失败 / 配置解析失败）→ `freshness="stale"`
@@ -633,12 +767,20 @@ X-Frame-Options: DENY
 - 已有 owned artifact 更新失败 → **恢复原文件**，不是删除
 - 补偿本身失败 → `recovery_required` + `detail` 含具体修复命令
 - `disable` 半成功后再调一次能收尾
-- 跨进程锁：CLI 与 API 并发 → 一方 409/占用提示；锁文件释放后**仍存在**
+- **disable 的逐步故障注入**：`disable` 失败 → 状态不变；删文件失败 → 重新 enable 恢复；
+  `daemon-reload` 失败 → **不回滚**且下次调用能收尾
+- 跨进程锁：CLI 与 API 并发 → 一方 409/占用提示；锁文件释放后**仍存在**；
+  Python 侧的 `flock` 与 `install.sh` 的 `flock(1)` 锁的是**同一路径**
 
 **入口与配置**
 - `python -m server.launch --config <不存在>` → 非零退出，**不回落默认配置**
 - `--config` 指向不可读文件 / 解析失败 → 非零退出
 - 不给 `--config` 时行为与 `python -m server.main` 一致
+- **`load_config()` 的既有语义不变**：`load_config(<不存在的路径>)` 仍返回默认配置
+  （`tests/test_config.py:11` 现有断言必须继续通过），strict 只在显式传 `strict=True` 时生效
+- `ConfigSource` 优先级：`--config` > `AI_USAGE_CONFIG` > 仓库 `config.toml` > 内置默认
+- `origin` 为 `cli`/`env` 时 artifact 里写 `--config <abs>`；
+  为 `repo_default`/`builtin` 时**不写** `--config`
 - `config_path` 被绝对化后写入 artifact；秘密值不出现在 artifact 里
 - 生成的 unit 过 `systemd-analyze verify`
 - 含空格、`%`、引号的路径在四种格式里都正确转义
@@ -696,6 +838,19 @@ X-Frame-Options: DENY
 | 重要 1 probe 需受控 | §3 probe 段：专用探针、`-I -B`、净化环境、超时、异步、超时→unknown 而非 stale |
 | 重要 2 OPTIONS 断言不够具体 | §10：改成完整预检报文 + 三条断言 |
 | 次要 `UnitFileState` 写得过满 | §1.5 全表，`static`/`alias`/`generated` 等归 unknown |
+
+### 第四轮（对 v4）：3 处契约断口 + 2 处局部问题
+
+| 意见 | v5 处置 |
+|---|---|
+| 断口 1 `can_disable` 有关不掉的死角；ownership 枚举与转移表不一致；`managed_by` 表达不了并存 | §3：新增 `systemd_registration` artifact 类型；`can_disable` 明确含它；转移表改按 (kind, ownership) 分派；`managed_by` 降级为按固定优先级派生的 UI 简写，完整信息在 `artifacts` |
+| 断口 2 配置来源丢失 + strict 会破坏现有契约 | §〇.1 新增 `ConfigSource`（path + origin）与四级优先级、`enable()` 按 origin 决定是否写 `--config`；§〇.2 strict 作为 `load_config(strict=False)` 的可选参数，**不改既有语义** |
+| 断口 3 disable 表缺失 | §6.2 补出五步表，含「② 必须在 ③ 之前」的 systemd 行为理由，以及 ④ 失败不回滚的取舍 |
+| 局部 probe 在 `-I` 下必然失败 | §3 probe 段：写死 `-c` bootstrap + argv 传参（`package = false` 已核实） |
+| 局部 legacy `ExecStart` 反例缺测试 | §10：四条件改五条件 |
+| 锁身份未固定 | §6.1：写死路径、`flock` 协议、Windows mutex 名，`install.sh` 用 `flock(1)` 锁同一路径 |
+| `installation_state` 原始值应保留 | §3：`ArtifactStatus` 增加该字段 |
+| marker 不防同 UID 恶意进程 | 已接受：marker 防的是**命名碰撞与意外篡改**，不防已获得用户文件写权限的进程——那种情况下攻击者本就能直接改这些文件。不引入签名系统 |
 
 ### 前两轮遗留（复审已判通过的不再重复）
 
