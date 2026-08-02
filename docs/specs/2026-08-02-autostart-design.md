@@ -2,6 +2,99 @@
 
 2026-08-02
 
+> ## ⚠️ 状态：本文尚未定稿，**不要照此实现**
+>
+> 经 Codex 只读评审，结论为「需修改后开工」：3 项阻断、10 项重要。下方原文保留作为
+> 出发点，**必须先按〈评审待修订项〉整体修订并重新评审**。
+>
+> 前置依赖已完成：公版默认值改造（`2026-08-02-public-defaults-design.md`，已合入
+> `da153ff`）。评审明确指出它是本功能的前置——否则自启动会把一套带私人默认、
+> 在外部机器必然异常的 daemon 固化进持久启动项。
+
+## 评审待修订项
+
+### 阻断（必须先解决）
+
+1. **点击劫持绕过全部防线**。现有安全设计只防"恶意网页自己发跨域请求"。攻击者可把
+   本地面板放进透明 iframe 诱导用户点真开关——请求由面板自身发出，Host、Origin、
+   自定义头全部合法。修法：首页响应必须下发 `Content-Security-Policy: frame-ancestors 'none'`
+   （必须是 HTTP 响应头，不能用 `<meta>`）+ `X-Frame-Options: DENY` 兼容旧浏览器；
+   首次开启建议再加一次明确确认。
+2. **unit 撞名会误伤既有部署**。本文计划写入 `~/.config/systemd/user/ai-usage.service`，
+   而 `deploy/install.sh` 用的正是同一路径同一名字。老用户装过之后，`status()` 会误报
+   「已开启」，`enable()` 可能覆盖、`disable()` 可能删除用户原有部署——直接违反
+   「不开启不碰系统」与「可完全恢复」。修法：改用独立名称（如
+   `ai-usage-panel-autostart.service`）；生成文件里写入格式版本、项目根路径与
+   ownership marker；状态区分 `owned / external / stale / conflict / disabled`；
+   任何无法确认归属的文件一律不覆盖不删除，返回 409 并给出手工处理说明。
+   ⚠️ 仅改名字不够——两个 unit 会抢同一端口，需设计迁移与冲突规则。
+3. **linger 语义相反且无法保证恢复**。用户管理器本来就会在首次登录时启动 user service；
+   linger 的作用是「开机即启动 + 最后一次注销后继续运行」，恰是本功能不想要的常驻。
+   它还修改独立的系统状态（用户原本就开着 linger 时不能在关闭本功能时关掉它），
+   且 linger 在图形登录前启动，浏览器窗口拿不到 DISPLAY/Wayland 会话。
+   修法：**彻底砍掉 linger**。daemon 用 systemd user unit，登录后开窗口用 XDG autostart。
+
+### 重要
+
+4. **macOS**：`~/Library/LaunchAgents` + `RunAtLoad` 可行，但「plist 存在 = 已启用」不成立
+   ——macOS 13+ 允许用户在「登录项」里禁用而保留 plist。且本文只写了 enable 时 load、
+   没写 disable 时 unload，删 plist 不会可靠停止已加载的 job。修法：注册/注销成对处理
+   （bootstrap/bootout 或 load/unload）；查不到授权状态时返回 `authorization_unknown`，
+   不得武断报 `enabled=true`；plist 权限不得 group/world writable。
+5. **Windows**：启动目录路径正确，但应经 `FOLDERID_Startup` 解析以适配重定向场景；
+   **VBScript 已进入微软退役流程**，改用 `.lnk` 指向 `pythonw.exe`；Windows 允许在设置
+   或任务管理器中禁用启动项而不删文件，故「文件存在 = 启用」同样不可靠，状态文案要区分
+   「已注册」与「系统确认会运行」。
+6. **Windows 覆盖面**：README 当前要求 Windows 用户把 daemon 跑在 WSL，项目从未在原生
+   Windows 上验证过。**用户已决定：做 Windows backend 但不实机验证**，因此必须在文档与
+   UI 上明确标注 experimental，不得把未验证路径包装成已支持。
+   （代码层面已确认无 Unix 硬依赖：路径全走 `expanduser()`；唯一风险是 codex 若装成
+   `.cmd` 包装器则子进程可能起不来，但有读会话日志的兜底降级。）
+7. **Linux XDG**：应优先 `$XDG_CONFIG_HOME/autostart`，未设置时才回落 `~/.config/autostart`；
+   `Hidden=true`、无效 `TryExec`、`OnlyShowIn/NotShowIn` 都会让文件存在却不运行。
+   **backend 应按功能选择而非按「有没有 systemd」**：daemon 用 systemd，GUI 窗口用 XDG。
+8. **launcher 生命周期契约缺失**：没说明它是 exec daemon、常驻监督、还是启动子进程后退出
+   ——对 systemd/launchd 三者语义完全不同，会导致 daemon 被误判启动完成、成为失管子进程
+   或被服务管理器清理。且「只探测端口打开」会把占用 8788 的无关服务误认成 ai-usage，
+   探测与启动之间还有竞态。修法：后台管理器直接监督 daemon，开窗口作为独立的登录后动作；
+   探测改用 ai-usage 专用健康端点并等待就绪；用进程锁处理并发启动。
+9. **状态模型**：`status()` 出错时返回 `supported=False` 会混淆「平台不支持」与
+   「查询临时失败」，还可能禁用开关导致用户无法从 UI 清理残留项。改三态
+   `enabled: true | false | null`，另设 `supported` / `state` / 错误码。
+10. **失败处理**：「要么成功要么没变化」目前无法保证——文件写入、reload、enable、
+    launchctl 注册、开窗口是多套独立系统操作，启动浏览器后无法回滚。修法：序列化
+    enable/disable；同目录原子替换并拒绝跟随异常 symlink；所有系统命令设超时；
+    先完成可回滚的注册再提交状态，开窗口只作 best-effort。重复 enable 对 owned 项 no-op、
+    对 foreign 项报冲突；disable 缺失项 no-op。
+    「目录完全干净」的测试断言应改为「恢复到操作前快照」——`LaunchAgents`、`autostart`、
+    `systemd/user` 是共享目录，不能因为变空就删掉。
+11. **路径快照**：只验证解释器与项目目录存在，不足以判断可启动（launcher 模块、依赖、
+    配置可能已失效）；服务管理器环境极精简（现有 unit 已专门补 PATH）。修法：状态应解析
+    并校验自己生成的启动项内容；保存格式版本；用平台原生序列化（plist 用 `plistlib`，
+    desktop/systemd 遵守各自转义规则），**不得用字符串拼 shell 命令**。
+12. **安全细节收紧**：`PUT` + 自定义头确实能让普通恶意网页无法发出请求（预检会失败），
+    但「Origin 缺失即放行」是不必要的 fail-open——CLI 兜底可直接调 backend，无需为 curl
+    放宽。Host 白名单需补 `[::1]:port`（配置已允许 `::1`），并拒绝缺失/重复/畸形值，
+    不信任 `X-Forwarded-Host`。
+13. **测试**：纯 monkeypatch 循环不足以支撑公开的跨平台承诺。需补：关闭状态查询零写入、
+    旧 `ai-usage.service` 冲突、foreign/损坏/symlink 文件、每步失败后的回滚、disable
+    半成功重试、并发 PUT、命令超时、IPv6、缺失 Origin、预检、CSP/X-Frame-Options、
+    操作前已有的无关文件保持原样。
+14. **范围**：建议直接砍掉 linger、enable 后立即 `launchctl load` 开第二个窗口、复杂浏览器
+    枚举与 `no_browser` 历史状态；推荐拆两阶段——先做「daemon 登录自启」（由 OS 直接监督
+    daemon），再做「登录后自动开窗口」（Linux 用 XDG，macOS/Windows 用各自 GUI 登录机制）。
+    `POST /api/refresh` 的加固可独立提交，不必绑在本功能里。
+
+### 评审确认无误的部分
+
+Windows 启动文件夹默认路径、用户级 LaunchAgent、XDG autostart 三种机制本身可行；
+「不另存布尔配置、直接查询操作系统事实」的方向正确——问题在于当前查询的「事实」
+过于粗糙，且未处理既有项归属与系统级禁用状态。应保留：不写 `config.toml`、
+读取系统真实状态、唯一且可验证的 owned artifact、CLI disable 兜底、
+Host/Origin/自定义头三重校验、禁止 iframe。
+
+---
+
 ## 目标
 
 面板里加一个可开关的「登录时自动启动」选项，跨 Windows / macOS / Linux 通用。
