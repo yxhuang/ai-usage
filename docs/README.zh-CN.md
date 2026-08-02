@@ -51,8 +51,9 @@
 
 ## 它不做什么
 
-**凭证不出本机。** daemon 读的是各家 CLI 自己写下的 token 文件，调的是对应厂商自己的
-账户元数据接口，token 只在内存里待着。落盘的只有用量数字，而且服务在配置层面就拒绝
+**凭证只发回其所属厂商，不发往任何第三方。** 三家的鉴权方式不同：Claude 读取
+claude CLI 写下的 OAuth 凭证文件，Codex 由 app-server 使用它自己的登录态，
+Kimi 使用你配置的 API key。凭证只在内存里待着。落盘的只有用量数字，而且服务在配置层面就拒绝
 绑定回环地址以外的任何地址。
 
 **跑它不花钱。** 这些是账户接口，不是推理接口，轮询不消耗任何对话额度。
@@ -77,8 +78,15 @@ journalctl --user -u ai-usage -f     # 看日志
 ## 环境要求
 
 - **Python ≥ 3.11** 和 [uv](https://docs.astral.sh/uv/)
-- 三家 CLI 至少装了一个并登录过。面板**只读复用**它们已有的凭证，
-  自己没有登录流程，也永远不会问你要密码。
+- 至少配好一家 provider——三家的前置条件不一样：
+
+| Provider | 前置条件 |
+|---|---|
+| Claude | 装好并登录 `claude` CLI，面板只读复用它的 OAuth token。 |
+| Codex | 装好并登录 `codex` CLI，且 `codex` 在 `PATH` 里。面板临时拉起 `codex app-server` 取数，失败时降级读本地 session 记录。 |
+| Kimi | 一个 `sk-kimi-*` API key。Kimi **不读 CLI 登录态**，只认 API key：在 `config.toml` 写 `providers.kimi.api_key`、export `KIMI_API_KEY`、或用 `providers.kimi.api_key_file` 指向一个含 key 的文件，三者任一。 |
+
+面板自己没有登录流程，也永远不会问你要密码。
 
 运行时依赖只有 `fastapi` / `uvicorn` / `httpx`；前端是纯 HTML/CSS/JS，
 零构建链、零 node 依赖。
@@ -133,21 +141,24 @@ Chrome 大版本升级若改了窗口结构有失灵的可能。标题栏根本�
 不建 `config.toml` 就用内置默认值。几个值得知道的：
 
 - `server.port`：默认 `8788`。`server.host` **只接受回环地址**，填别的会直接拒绝启动。
-- `providers.claude.proxy`：Anthropic 走代理时在这里填。**必须显式配**——
-  daemon 是非交互进程，不读 shell 配置文件，不会自动继承代理环境变量。
-  反过来却不成立：代理软件开着 **TUN 模式**时会抢走默认路由、在 IP 层接管流量，
-  这不是任何 provider 配置能豁免的。若某家突然持续超时、而用 `curl` 走代理端口却正常，
+- `providers.<id>.proxy`：三家都支持显式配置代理 URL。默认（不写、写空串或纯空白）是**直连**，
+  且此时会**忽略**环境变量里的代理设置（`HTTP_PROXY` 等）——「直连」名实相符，
+  配置值是唯一让流量走代理的途径。反过来有一个例外：代理软件开着 **TUN 模式**时
+  会抢走默认路由、在 IP 层接管流量，这不是任何 provider 配置能豁免的。
+  若某家突然持续超时、而用 `curl` 走代理端口却正常，
   先看 `ip route get <目标 IP>`，别急着怀疑上游 API。
 - `poller.first_retry_seconds`：**首次**轮询失败后等多久重试，默认 `60` 秒。
   之后每次连续失败翻倍，上限是 `max_backoff_seconds`；成功的轮询一律用 `interval_seconds`。
-- `providers.kimi`：key 按 `api_key` → 环境变量 → 密钥文件三级回退，第一个取到的生效。
-  密钥文件是用正则提取变量值，**不会 source/exec** 它。
-- `providers.codex.command`：拉起 app-server 的命令，可换成自己的包装脚本。
+- `providers.kimi`：key 按 `api_key` → 环境变量 → 密钥文件三级回退，第一个取到的生效；
+  不配 `api_key_file` 则跳过文件来源。密钥文件是用正则提取变量值，**不会 source/exec** 它。
+- `providers.codex.command`：拉起 app-server 的命令（默认 `codex`），可换成自己的包装脚本。
 
 ## 安全
 
 - 服务只绑回环地址，配置层面强制校验，不给「不小心暴露到局域网」留口子。
-- 凭证**只读复用**各 CLI 已有的文件，token 只在内存里，绝不落盘、绝不入日志。
+- 凭证只发回其所属厂商，不发往任何第三方。Claude **只读复用** CLI 写下的 OAuth 文件，
+  Codex 由 app-server 使用自己的登录态，Kimi 使用配置的 API key。
+  凭证只在内存里，绝不落盘、绝不入日志。
   落盘缓存 `data/cache.json` 只有用量数字。
 - 日志遇到异常只记 provider 与异常类型，不记异常正文和 traceback
   （正文可能夹带带 token 的 URL）。
@@ -157,7 +168,7 @@ Chrome 大版本升级若改了窗口结构有失灵的可能。标题栏根本�
 ## 开发
 
 ```bash
-uv run pytest          # 68 项测试；不联网、不读真实凭证
+uv run pytest          # 87 项测试；不联网、不读真实凭证
 ```
 
 测试用 `httpx.MockTransport` 与临时目录构造报文和假凭证。
@@ -167,7 +178,7 @@ uv run pytest          # 68 项测试；不联网、不读真实凭证
 
 ## 现状
 
-还很早期，这点得说清楚。逻辑有 68 项离线测试覆盖，但目前只在一台机器上跑过。
+还很早期，这点得说清楚。逻辑有 87 项离线测试覆盖，但目前只在一台机器上跑过。
 如果某家的报文结构在你的账号上不一样（不同套餐档位、不同区域），
 带上脱敏后的报文提个 issue 会非常有帮助。
 

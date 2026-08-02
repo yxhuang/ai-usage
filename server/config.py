@@ -38,20 +38,22 @@ class ProviderConfig:
 class Config:
     server: ServerConfig = field(default_factory=ServerConfig)
     poller: PollerConfig = field(default_factory=PollerConfig)
+    # 内置默认必须是通用值：任何私人环境（本机代理端口、私有包裹脚本、
+    # 个人密钥文件路径）只能出现在不入库的 config.toml 里。
+    # proxy 语义：缺失 / 空串 / 纯空白 = 直连（且忽略环境变量里的代理）；
+    # 非空 URL = 使用该代理。
     providers: dict[str, ProviderConfig] = field(
         default_factory=lambda: {
             "claude": ProviderConfig(
                 enabled=True,
                 options={
                     "credentials_path": "~/.claude/.credentials.json",
-                    "proxy": "http://127.0.0.1:7890",
                 },
             ),
             "codex": ProviderConfig(
                 enabled=True,
                 options={
-                    "command": "codex-nowin",
-                    "proxy": "http://127.0.0.1:7890",
+                    "command": "codex",
                     "sessions_dir": "~/.codex/sessions",
                     "app_server_timeout_seconds": 30,
                     "app_server_max_failures": 3,
@@ -62,7 +64,7 @@ class Config:
                 enabled=True,
                 options={
                     "api_key_env": "KIMI_API_KEY",
-                    "api_key_file": "~/.config/shell/secrets.sh",
+                    "api_key_file": None,
                 },
             ),
         }
@@ -113,4 +115,20 @@ def load_config(path: Path | None = None) -> Config:
             enabled=bool(pconf.get("enabled", existing.enabled)),
             options=options,
         )
+    for pid, pconf in cfg.providers.items():
+        if "proxy" in pconf.options:
+            pconf.options["proxy"] = _normalize_proxy(pid, pconf.options["proxy"])
     return cfg
+
+
+def _normalize_proxy(pid: str, value: object) -> str | None:
+    """proxy 归一化：缺失/空串/纯空白 → None（直连）；非空 URL 原样保留。"""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(
+            f"providers.{pid}.proxy 必须是字符串 URL 或不写（直连），"
+            f"当前配置为 {value!r}，请修正 config.toml"
+        )
+    stripped = value.strip()
+    return stripped or None

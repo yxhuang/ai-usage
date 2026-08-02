@@ -200,7 +200,9 @@ async def test_unknown_duration_generic_rule(tmp_path, monkeypatch):
 
 
 async def test_no_proxy_and_authorization_header(tmp_path, monkeypatch):
-    # 即使环境里有代理变量，请求也必须直连 api.kimi.com
+    # 注：httpx 传入自定义 transport 时本就不加载环境代理（client._mounts 为空），
+    # 所以本条只验证请求头与目标 URL；「环境代理被忽略」由下方
+    # _CapturingClient 两条用例在构造参数层面验证
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("https_proxy", "http://127.0.0.1:9")
     requests: list = []
@@ -213,6 +215,51 @@ async def test_no_proxy_and_authorization_header(tmp_path, monkeypatch):
     assert request.url.path == "/coding/v1/usages"
     assert request.headers["Authorization"] == f"Bearer {FAKE_KEY}"
     assert request.headers["Accept"] == "application/json"
+
+
+class _CapturingClient:
+    """记录构造参数的 httpx.AsyncClient 替身：验证网络层配置而非请求本身。
+
+    必须走这条路：传 MockTransport 时 httpx 不加载环境代理，
+    即使删掉 trust_env=False 也测不出来。
+    """
+
+    captured: dict = {}
+
+    def __init__(self, **kwargs):
+        _CapturingClient.captured = kwargs
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get(self, url, headers=None):
+        return httpx.Response(200, text=FIXTURE)
+
+
+async def test_no_proxy_ignores_env_proxy(tmp_path, monkeypatch):
+    # 环境里有代理变量时，默认（proxy=None）必须直连：trust_env=False 且不传代理
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    monkeypatch.setenv("https_proxy", "http://127.0.0.1:9")
+    monkeypatch.setattr(httpx, "AsyncClient", _CapturingClient)
+    provider = KimiProvider(api_key=FAKE_KEY, api_key_file=None)
+    usage = await provider.fetch()
+    assert usage.status == "ok"
+    assert _CapturingClient.captured.get("trust_env") is False
+    assert not _CapturingClient.captured.get("proxy")
+
+
+async def test_explicit_proxy_passed_to_client(tmp_path, monkeypatch):
+    monkeypatch.setattr(httpx, "AsyncClient", _CapturingClient)
+    provider = KimiProvider(
+        api_key=FAKE_KEY, api_key_file=None, proxy="http://127.0.0.1:7890"
+    )
+    usage = await provider.fetch()
+    assert usage.status == "ok"
+    assert _CapturingClient.captured.get("proxy") == "http://127.0.0.1:7890"
+    assert _CapturingClient.captured.get("trust_env") is False
 
 
 async def test_network_error_sanitized(tmp_path, monkeypatch):
@@ -229,3 +276,41 @@ async def test_network_error_sanitized(tmp_path, monkeypatch):
     # 异常正文可能夹带 key，error 文案只留异常类型名
     assert FAKE_KEY not in usage.error
     assert usage.error == "网络错误: ConnectError"
+
+
+async def test_api_key_file_none_no_crash_no_request(tmp_path, monkeypatch):
+    """api_key_file=None（默认）不得 Path(None) 崩溃，直接跳过文件来源。"""
+    monkeypatch.delenv("KIMI_API_KEY", raising=False)
+    requests: list = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, text=FIXTURE)
+
+    provider = KimiProvider(
+        api_key=None,
+        api_key_file=None,
+        transport=httpx.MockTransport(handler),
+    )
+    usage = await provider.fetch()
+    assert usage.status == "error"
+    assert "未配置 Kimi API key" in usage.error
+    assert "secrets.sh" not in usage.error
+    assert requests == []
+
+
+async def test_api_key_file_none_with_explicit_key_ok(tmp_path, monkeypatch):
+    requests: list = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, text=FIXTURE)
+
+    provider = KimiProvider(
+        api_key=FAKE_KEY,
+        api_key_file=None,
+        transport=httpx.MockTransport(handler),
+    )
+    usage = await provider.fetch()
+    assert usage.status == "ok"
+    assert requests[0].headers["Authorization"] == f"Bearer {FAKE_KEY}"

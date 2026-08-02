@@ -206,3 +206,123 @@ async def test_newest_file_with_valid_record_wins(tmp_path):
     assert usage.plan == "Pro"
     assert usage.windows[0].id == "5h"
     assert usage.windows[0].used_pct == 18.0
+
+
+PROXY_ENV_VARS = (
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+)
+
+
+def test_subprocess_env_strips_all_proxy_vars_when_direct(monkeypatch):
+    """proxy=None（直连）时，父环境的大小写代理变量都必须从子进程环境删除。"""
+    for name in PROXY_ENV_VARS:
+        monkeypatch.setenv(name, "http://127.0.0.1:9")
+    env = CodexProvider(proxy=None)._subprocess_env()
+    for name in PROXY_ENV_VARS:
+        assert name not in env
+
+
+def test_subprocess_env_sets_proxy_when_configured(monkeypatch):
+    """显式代理时：http/https 四项写入目标代理，all/no 四项不得从父环境漏入。"""
+    for name in PROXY_ENV_VARS:
+        monkeypatch.setenv(name, "http://127.0.0.1:9")
+    monkeypatch.setenv("NO_PROXY", "*")
+    monkeypatch.setenv("no_proxy", "*")
+    env = CodexProvider(proxy="http://127.0.0.1:7890")._subprocess_env()
+    for name in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        assert env[name] == "http://127.0.0.1:7890"
+    for name in ("all_proxy", "no_proxy", "ALL_PROXY", "NO_PROXY"):
+        assert name not in env
+
+
+class _FakeStdin:
+    def __init__(self) -> None:
+        self._closing = False
+
+    def write(self, data: bytes) -> None:
+        pass
+
+    async def drain(self) -> None:
+        pass
+
+    def is_closing(self) -> bool:
+        return self._closing
+
+    def close(self) -> None:
+        self._closing = True
+
+    async def wait_closed(self) -> None:
+        pass
+
+
+class _FakeProc:
+    def __init__(self, stdout: asyncio.StreamReader) -> None:
+        self.stdin = _FakeStdin()
+        self.stdout = stdout
+        self.stderr = None
+        self.returncode: int | None = None
+
+    def terminate(self) -> None:
+        self.returncode = -15
+
+    def kill(self) -> None:
+        self.returncode = -9
+
+    async def wait(self) -> int:
+        if self.returncode is None:
+            self.returncode = 0
+        return self.returncode
+
+
+async def _run_rpc_with_captured_env(monkeypatch, proxy: str | None) -> dict:
+    """捕获 asyncio.create_subprocess_exec 实际收到的 env 关键字参数。"""
+    captured: dict = {}
+
+    async def fake_exec(*args, **kwargs):
+        captured["env"] = kwargs["env"]
+        reader = asyncio.StreamReader()
+        reader.feed_data(
+            b'{"id":1,"result":{}}\n'
+            b'{"id":2,"result":{"rateLimits":{"primary":'
+            b'{"usedPercent":10,"windowDurationMins":300,"resetsAt":null}}}}\n'
+        )
+        return _FakeProc(reader)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    await CodexProvider(proxy=proxy)._rpc_call()
+    return captured["env"]
+
+
+async def test_exec_env_actually_stripped_when_direct(monkeypatch):
+    """直连时，交给子进程的 env 字典里不得有任何代理变量（执行层断言）。"""
+    for name in PROXY_ENV_VARS:
+        monkeypatch.setenv(name, "http://127.0.0.1:9")
+    env = await _run_rpc_with_captured_env(monkeypatch, proxy=None)
+    for name in PROXY_ENV_VARS:
+        assert name not in env
+
+
+async def test_exec_env_actually_carries_configured_proxy(monkeypatch):
+    """显式代理时，子进程 env 必须带目标代理且不含 all/no 残留（执行层断言）。"""
+    monkeypatch.setenv("NO_PROXY", "*")
+    monkeypatch.setenv("ALL_PROXY", "http://127.0.0.1:9")
+    env = await _run_rpc_with_captured_env(
+        monkeypatch, proxy="http://127.0.0.1:7890"
+    )
+    for name in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        assert env[name] == "http://127.0.0.1:7890"
+    for name in ("all_proxy", "no_proxy", "ALL_PROXY", "NO_PROXY"):
+        assert name not in env
+
+
+def test_defaults_are_generic():
+    provider = CodexProvider()
+    assert provider._command == "codex"
+    assert provider._proxy is None

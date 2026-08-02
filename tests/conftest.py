@@ -20,8 +20,18 @@ CREDENTIAL_ENV_VARS = (
     "AI_USAGE_CONFIG",
 )
 
+# 开发机/CI 上的代理变量会污染"直连"语义的测试，一律剥掉
+PROXY_ENV_VARS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
+
 
 @pytest.fixture(autouse=True)
 def _isolate_credential_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in CREDENTIAL_ENV_VARS:
+    for name in CREDENTIAL_ENV_VARS + PROXY_ENV_VARS:
         monkeypatch.delenv(name, raising=False)

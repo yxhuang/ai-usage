@@ -117,13 +117,18 @@ class ClaudeProvider:
         if isinstance(expires_at_ms, int) and expires_at_ms <= now_ms:
             return error_usage(self.id, self.name, "auth_expired", _AUTH_EXPIRED_MSG)
 
-        # 3. 请求（显式走代理；裸连必吃 403）
+        # 3. 请求。proxy 为 None（直连）时必须显式 trust_env=False——
+        #    httpx 默认会读 HTTP_PROXY 等环境变量，不设的话"直连"名不副实。
+        #    （作者所在网络裸连 Anthropic 必吃 403，故本机配置显式走代理；
+        #    这不是普遍事实，默认可直连。）
         try:
             client_kwargs: dict = {"timeout": 20.0}
             if self._transport is not None:
                 client_kwargs["transport"] = self._transport
             else:
                 client_kwargs["proxy"] = self._proxy
+                if self._proxy is None:
+                    client_kwargs["trust_env"] = False
             async with httpx.AsyncClient(**client_kwargs) as client:
                 resp = await client.get(
                     USAGE_URL, headers={"Authorization": f"Bearer {token}"}

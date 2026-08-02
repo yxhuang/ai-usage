@@ -1,8 +1,9 @@
-"""Kimi provider：用 sk-kimi-* API key 直连 api.kimi.com。
+"""Kimi provider：用 sk-kimi-* API key 请求 api.kimi.com。
 
-安全约束：key 只在内存，绝不写日志/异常消息；不传 proxy，且 trust_env=False
-不读环境变量里的代理设置（HTTP_PROXY/HTTPS_PROXY 等）。注意这不等于流量一定
-没有经过本机代理软件：TUN 模式的代理在 IP 层接管路由，本模块无法感知。
+安全约束：key 只在内存，绝不写日志/异常消息。默认直连：不传 proxy 且
+trust_env=False，不读环境变量里的代理设置（HTTP_PROXY/HTTPS_PROXY 等）；
+企业网络用户可在 config.toml 里为 Kimi 显式配置 proxy。注意这不等于流量
+一定没有经过本机代理软件：TUN 模式的代理在 IP 层接管路由，本模块无法感知。
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 USAGE_URL = "https://api.kimi.com/coding/v1/usages"
 
 _NO_KEY_MSG = (
-    "未配置 Kimi API key（config.toml 的 api_key / 环境变量 {env} / secrets.sh 三者任一）"
+    "未配置 Kimi API key（config.toml 的 api_key / 环境变量 {env} / 配置的密钥文件 三者任一）"
 )
 _AUTH_EXPIRED_MSG = "Kimi API key 无效或已过期，请更新 key"
 
@@ -35,12 +36,14 @@ class KimiProvider:
         self,
         api_key: str | None = None,
         api_key_env: str = "KIMI_API_KEY",
-        api_key_file: str = "~/.config/shell/secrets.sh",
+        api_key_file: str | None = None,
+        proxy: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._api_key = api_key
         self._api_key_env = api_key_env
-        self._api_key_file = Path(api_key_file).expanduser()
+        self._api_key_file = Path(api_key_file).expanduser() if api_key_file else None
+        self._proxy = proxy
         self._transport = transport  # 测试注入用；生产为 None
 
     def _resolve_api_key(self) -> str | None:
@@ -54,6 +57,8 @@ class KimiProvider:
 
     def _key_from_file(self) -> str | None:
         """从 shell 密钥文件里正则提取变量值；只做正则匹配，禁止 source/exec。"""
+        if self._api_key_file is None:
+            return None
         try:
             text = self._api_key_file.read_text(encoding="utf-8")
         except OSError:
@@ -79,10 +84,13 @@ class KimiProvider:
                 self.id, self.name, "error", _NO_KEY_MSG.format(env=self._api_key_env)
             )
 
-        # 2. 请求：不传 proxy，trust_env=False 只保证不读环境变量里的代理
-        #    设置；若本机代理软件开了 TUN 模式（IP 层接管路由），流量仍可能
-        #    被接管，本模块对此无法感知
+        # 2. 请求：默认直连——不传 proxy 且 trust_env=False，只保证不读环境
+        #    变量里的代理设置；显式配置了 proxy 时使用它（trust_env 仍保持
+        #    False，行为只由配置决定）。若本机代理软件开了 TUN 模式
+        #    （IP 层接管路由），流量仍可能被接管，本模块对此无法感知
         client_kwargs: dict = {"timeout": 20.0, "trust_env": False}
+        if self._proxy is not None:
+            client_kwargs["proxy"] = self._proxy
         if self._transport is not None:
             client_kwargs["transport"] = self._transport
         try:

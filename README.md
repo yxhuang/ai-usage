@@ -57,8 +57,10 @@ second red with a different meaning would blunt both.
 
 ## What it does not do
 
-It never sends your credentials anywhere. The daemon reads the token files your CLIs
-already wrote, calls the vendor's own account-metadata endpoint, and keeps the token in
+It never sends your credentials anywhere except back to the vendor they belong to —
+no third party ever sees them. How each provider authenticates differs: Claude reads
+the OAuth file its CLI already wrote, Codex's app-server uses its own login state,
+and Kimi uses the API key you configure. Credentials live in
 memory. Nothing is written to disk except the usage numbers themselves, and the server
 refuses to bind to anything but a loopback address.
 
@@ -86,8 +88,15 @@ journalctl --user -u ai-usage -f
 ## Requirements
 
 - **Python 3.11+** and [uv](https://docs.astral.sh/uv/)
-- At least one of the three CLIs installed and logged in. The panel **reuses their existing
-  credentials read-only** — it has no login flow of its own, and never asks for a password.
+- At least one provider set up — the prerequisites differ per provider:
+
+| Provider | Prerequisite |
+|---|---|
+| Claude | `claude` CLI installed and logged in. The panel reuses its OAuth token read-only. |
+| Codex | `codex` CLI installed, logged in, and on your `PATH`. The panel spawns `codex app-server`; if that fails it falls back to local session logs. |
+| Kimi | An `sk-kimi-*` API key. Kimi does **not** read the CLI's login state — set `providers.kimi.api_key` in `config.toml`, export `KIMI_API_KEY`, or point `providers.kimi.api_key_file` at a file containing it. |
+
+The panel has no login flow of its own and never asks for a password.
 
 Runtime dependencies are `fastapi`, `uvicorn`, and `httpx`. The frontend is plain
 HTML/CSS/JS: no build step, no node, no npm.
@@ -151,25 +160,31 @@ Everything is optional — see [config.example.toml](config.example.toml). Witho
 
 - `server.port` — defaults to `8788`. `server.host` **only accepts loopback addresses**;
   anything else refuses to start.
-- `providers.claude.proxy` — if you reach Anthropic through a proxy, set it here.
-  **You must set it explicitly**: the daemon is a non-interactive process, doesn't read your
-  shell config, and will not inherit proxy environment variables. The reverse does not hold,
-  though: a proxy running in **TUN mode** claims the default route and intercepts at the IP
-  layer, so traffic still goes through it no matter what any provider is configured to do.
-  If a provider suddenly times out while `curl` through the proxy port works, check
+- `providers.<id>.proxy` — all three providers support an explicit proxy URL. The default
+  (missing, empty, or whitespace-only) is a **direct connection**, and proxy environment
+  variables
+  (`HTTP_PROXY` etc.) are deliberately **ignored** in that case, so "direct" really means
+  direct: the config value is the only way a proxy is used. One caveat in the other
+  direction: a proxy running in **TUN mode** claims the default route and intercepts at the
+  IP layer, so traffic still goes through it no matter what any provider is configured to
+  do. If a provider suddenly times out while `curl` through the proxy port works, check
   `ip route get <target ip>` before suspecting the upstream API.
 - `poller.first_retry_seconds` — how long to wait after the *first* failed poll, default
   `60`. Each further consecutive failure doubles it, capped by `max_backoff_seconds`.
   Successful polls always use `interval_seconds`.
 - `providers.kimi` — the key falls back through `api_key` → environment variable → key file,
-  first hit wins. The key file is parsed with a regex; it is **never** sourced or executed.
-- `providers.codex.command` — the command used to spawn app-server, in case you wrap it.
+  first hit wins; without `api_key_file` the file source is skipped. The key file is parsed
+  with a regex; it is **never** sourced or executed.
+- `providers.codex.command` — the command used to spawn app-server (default `codex`), in
+  case you wrap it.
 
 ## Security
 
 - The server binds to loopback only, enforced in config validation. There is no option to
   expose it to your LAN by accident.
-- Credentials are **read-only reuse** of the files your CLIs already wrote. Tokens live in
+- Credentials are only ever sent back to the vendor they belong to, never to any third
+  party. Claude reuses the OAuth file its CLI wrote (**read-only**), Codex's app-server
+  uses its own login state, and Kimi uses the API key you configure. Credentials live in
   memory, are never written to disk, and are never logged. The on-disk cache
   (`data/cache.json`) holds usage numbers and nothing else.
 - On error, logs record the provider name and exception type only — never the message or
@@ -181,7 +196,7 @@ Everything is optional — see [config.example.toml](config.example.toml). Witho
 ## Development
 
 ```bash
-uv run pytest      # 68 tests; no network, no real credentials
+uv run pytest      # 87 tests; no network, no real credentials
 ```
 
 Tests build responses and fake credentials with `httpx.MockTransport` and temp directories.
@@ -192,7 +207,7 @@ a real credential.
 
 ## Status
 
-Early, and honest about it. The logic is covered by 68 offline tests, but it has only run on
+Early, and honest about it. The logic is covered by 87 offline tests, but it has only run on
 one machine so far. If a provider's response shape differs on your account — a different
 plan tier, a different region — a bug report with the (redacted) payload would genuinely
 help.

@@ -1,6 +1,13 @@
 # ai-usage 设计文档
 
 > 状态：已确认（2026-07-26）。本文档是实施的唯一事实源。
+>
+> ⚠️ **部分条款已被取代（2026-08-02）**：本文档把作者私人网络环境写成了设计红线
+> （§4.1「必须走代理 `http://127.0.0.1:7890`」、§4.2「必须经 `codex-nowin` 包裹拉起」、
+> §4.3 密钥文件默认 `~/.config/shell/secrets.sh`）。这些是私人配置而非通用设计，
+> 代码默认值已按 [2026-08-02-public-defaults-design.md](2026-08-02-public-defaults-design.md)
+> 通用化：默认直连、`command = "codex"`、`api_key_file = None`；
+> 代理语义（缺失/空 = 直连且忽略环境代理）以新文档为准。
 
 ## 1. 背景与目标
 
@@ -122,6 +129,8 @@ class Provider(Protocol):
   仅当 `extra_usage.is_enabled` 为真时显示。
 - **网络**：必须走代理 `http://127.0.0.1:7890`（httpx 显式传 proxy，**不依赖 .bashrc**
   ——本机非交互进程不读 .bashrc，裸连必吃 403，这是踩过的坑）。
+  【已被取代：这是作者所在网络的事实，非普遍事实。代码默认直连且忽略环境代理，
+  见 2026-08-02-public-defaults-design.md。】
 - **token 过期**（credentials 里有 expiresAt）：v1 不实现 refresh 流程，
   状态置 `auth_expired`，卡片提示"随便用一次 claude CLI 即自动续期"。
 - **参考实现**：bozdemir/claude-usage-widget 源码。
@@ -131,6 +140,8 @@ class Provider(Protocol):
 - **首选**：临时拉起 `codex app-server --stdio`（JSON-RPC，一行一条 JSON），
   取到限额百分比与重置时间后即关进程，不常驻。
   **必须经 `codex-nowin` 包裹拉起**（interop 硬隔离铁律）；启动时显式传代理 env（同 §4.1 的坑）。
+  【已被取代：`codex-nowin` 是作者私有包裹脚本，代码默认改回 `codex`，
+  见 2026-08-02-public-defaults-design.md。】
   **实测确认（2026-07-26）**的最小握手序列：
   ```
   --> {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"...","version":"..."}}}

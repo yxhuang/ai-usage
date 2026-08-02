@@ -3,7 +3,7 @@
 # 使用方法：复制本文件为 config.toml 后再修改（cp config.example.toml config.toml）。
 # config.toml 已在 .gitignore 中，不会入库。
 # 若填写了 api_key 等敏感字段，请执行 chmod 600 config.toml。
-# 本文件中的值即各键的默认值；config.toml 不存在时程序按默认值正常启动。
+# 不建 config.toml 时程序按内置默认值启动；下列值即各键的默认值（注释掉的除外）。
 
 [server]
 host = "127.0.0.1"   # 只绑回环地址，勿改成 0.0.0.0
@@ -15,15 +15,18 @@ max_backoff_seconds = 1800  # 失败指数退避上限
 stale_after_seconds = 900   # 缓存数据超过此年龄即视为 stale
 first_retry_seconds = 60    # 首次失败后的重试等待；之后每次翻倍，封顶 max_backoff_seconds
 
+# 代理语义（三家一致）：不写 proxy 或写空串 = 直连，且忽略环境变量里的
+# HTTP_PROXY/HTTPS_PROXY 等代理设置；填非空 URL = 使用该代理。
+
 [providers.claude]
 enabled = true
 credentials_path = "~/.claude/.credentials.json"  # 读取时会 expanduser()
-proxy = "http://127.0.0.1:7890"                   # 必须走代理，裸连必 403
+# proxy = "http://127.0.0.1:7890"                 # 走代理时取消注释并改成你的地址
 
 [providers.codex]
 enabled = true
-command = "codex-nowin"                           # WSL interop 隔离包裹，禁止改成裸 codex
-proxy = "http://127.0.0.1:7890"                  # app-server 显式使用该代理
+command = "codex"                                 # 拉起 app-server 的命令，可换成自己的包装脚本
+# proxy = "http://127.0.0.1:7890"                # app-server 显式使用该代理
 sessions_dir = "~/.codex/sessions"               # app-server 失败时读取的兜底快照
 app_server_timeout_seconds = 30                  # 单次 app-server 总交互超时
 app_server_max_failures = 3                      # 连续失败达到此次数后暂停尝试
@@ -35,8 +38,8 @@ enabled = true
 #   1. api_key：直接写在本文件（写了请 chmod 600 本文件）
 #   2. 环境变量：变量名由 api_key_env 指定
 #   3. 密钥文件：从 api_key_file 指定的 shell 脚本里正则提取 api_key_env 那个变量
-#      （只做正则提取，绝不 source/exec 该文件）
-# 本机默认走第 3 条：密钥已由 chezmoi + age 纳管在 secrets.sh 里，无需手动复制。
+#      （只做正则提取，绝不 source/exec 该文件）；不配 api_key_file 则跳过该来源
 # api_key = "sk-kimi-..."
 api_key_env = "KIMI_API_KEY"
-api_key_file = "~/.config/shell/secrets.sh"
+# api_key_file = "~/.config/shell/secrets.sh"     # 从密钥文件取 key 时取消注释
+# proxy = "http://127.0.0.1:7890"                 # 默认直连；企业网络需要代理时取消注释

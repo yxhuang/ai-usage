@@ -211,3 +211,44 @@ async def test_credits_note_none_when_amounts_unusable(tmp_path):
     credit = next(w for w in usage.windows if w.id == "extra_credits")
     assert credit.note is None
     assert credit.used_pct == 33.0
+
+
+class _CapturingClient:
+    """记录构造参数的 httpx.AsyncClient 替身：验证网络层配置而非请求本身。"""
+
+    captured: dict = {}
+
+    def __init__(self, **kwargs):
+        _CapturingClient.captured = kwargs
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get(self, url, headers=None):
+        return httpx.Response(200, text=FIXTURE)
+
+
+async def test_no_proxy_ignores_env_proxy(tmp_path, monkeypatch):
+    # 环境里有代理变量时，proxy=None 也必须直连：trust_env=False
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    monkeypatch.setenv("https_proxy", "http://127.0.0.1:9")
+    monkeypatch.setattr(httpx, "AsyncClient", _CapturingClient)
+    cred = _write_credentials(tmp_path)
+    usage = await ClaudeProvider(credentials_path=str(cred), proxy=None).fetch()
+    assert usage.status == "ok"
+    assert _CapturingClient.captured.get("proxy") is None
+    assert _CapturingClient.captured.get("trust_env") is False
+
+
+async def test_explicit_proxy_passed_through(tmp_path, monkeypatch):
+    monkeypatch.setattr(httpx, "AsyncClient", _CapturingClient)
+    cred = _write_credentials(tmp_path)
+    usage = await ClaudeProvider(
+        credentials_path=str(cred), proxy="http://127.0.0.1:7890"
+    ).fetch()
+    assert usage.status == "ok"
+    assert _CapturingClient.captured.get("proxy") == "http://127.0.0.1:7890"
+    assert "trust_env" not in _CapturingClient.captured

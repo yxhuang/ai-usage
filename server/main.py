@@ -27,6 +27,7 @@ PROVIDER_ORDER = ["claude", "codex", "kimi"]
 
 
 def build_providers(cfg: Config) -> list[Provider]:
+    # 默认值一律以 Config 为唯一来源，这里不再维护第二套 fallback
     providers: list[Provider] = []
     for pid in PROVIDER_ORDER:
         pconf = cfg.providers.get(pid)
@@ -35,39 +36,32 @@ def build_providers(cfg: Config) -> list[Provider]:
         if pid == "claude":
             providers.append(
                 ClaudeProvider(
-                    credentials_path=pconf.options.get(
-                        "credentials_path", "~/.claude/.credentials.json"
-                    ),
+                    credentials_path=pconf.options["credentials_path"],
                     proxy=pconf.options.get("proxy"),
                 )
             )
         elif pid == "codex":
             providers.append(
                 CodexProvider(
-                    command=pconf.options.get("command", "codex-nowin"),
-                    proxy=pconf.options.get("proxy", "http://127.0.0.1:7890"),
-                    sessions_dir=pconf.options.get(
-                        "sessions_dir", "~/.codex/sessions"
-                    ),
-                    app_server_timeout_seconds=pconf.options.get(
-                        "app_server_timeout_seconds", 30
-                    ),
-                    app_server_max_failures=pconf.options.get(
-                        "app_server_max_failures", 3
-                    ),
-                    app_server_retry_after_seconds=pconf.options.get(
-                        "app_server_retry_after_seconds", 1800
-                    ),
+                    command=pconf.options["command"],
+                    proxy=pconf.options.get("proxy"),
+                    sessions_dir=pconf.options["sessions_dir"],
+                    app_server_timeout_seconds=pconf.options[
+                        "app_server_timeout_seconds"
+                    ],
+                    app_server_max_failures=pconf.options["app_server_max_failures"],
+                    app_server_retry_after_seconds=pconf.options[
+                        "app_server_retry_after_seconds"
+                    ],
                 )
             )
         elif pid == "kimi":
             providers.append(
                 KimiProvider(
                     api_key=pconf.options.get("api_key"),
-                    api_key_env=pconf.options.get("api_key_env", "KIMI_API_KEY"),
-                    api_key_file=pconf.options.get(
-                        "api_key_file", "~/.config/shell/secrets.sh"
-                    ),
+                    api_key_env=pconf.options["api_key_env"],
+                    api_key_file=pconf.options["api_key_file"],
+                    proxy=pconf.options.get("proxy"),
                 )
             )
     return providers

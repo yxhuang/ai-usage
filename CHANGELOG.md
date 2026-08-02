@@ -15,6 +15,24 @@ the logs said why.
 
 ### Changed
 
+- **Default configuration is now generic — breaking if you relied on the built-in
+  defaults.** The shipped defaults used to be one specific developer machine: a
+  `http://127.0.0.1:7890` proxy for Claude and Codex, a private `codex-nowin` wrapper as
+  the Codex command, and a `~/.config/shell/secrets.sh` key file for Kimi. A fresh clone
+  on any other machine could reach none of the three providers. The defaults are now:
+  direct connection for all three, `codex` as the Codex command, and no key file (Kimi
+  falls back to `api_key` → `KIMI_API_KEY`). If your setup matched the old defaults,
+  pin them explicitly in `config.toml` (see `config.example.toml`).
+- **Proxy semantics are now two clean states, and "direct" really is direct.** A missing,
+  empty, or whitespace-only `proxy` means direct connection; a non-empty URL means use
+  that proxy. Previously a proxy could not be disabled at all: omitting it kept the
+  built-in default via the config merge, an empty string crashed httpx, and even a
+  normalized "no proxy" leaked — httpx read `HTTP_PROXY` & friends unless told not to,
+  and the Codex app-server subprocess inherited the full parent environment. Now, with
+  no proxy configured, the Claude client is created with `trust_env=False` and the Codex
+  subprocess environment has the upper- and lowercase proxy variables (including
+  `ALL_PROXY` and `NO_PROXY`) actively removed before any configured proxy is applied.
+  Kimi also accepts an optional `proxy` for users on locked-down networks.
 - **Backoff now starts at 60 seconds instead of 10 minutes.** The delay was
   `interval_seconds * 2 ** failures`, so with the default 5-minute interval a *single*
   failed poll pushed the next attempt 10 minutes out, and three failures reached the
@@ -56,7 +74,8 @@ the logs said why.
 
 ### Notes
 
-- 69 offline tests, including coverage of the new backoff schedule.
+- 87 offline tests, including coverage of the new backoff schedule and the proxy
+  semantics (normalization, env-var isolation, subprocess environment scrubbing).
 - `docs/panel-dark.png` retaken with the lit tick. The new shot happens to catch Claude
   with its 5-hour bar short of the tick and its weekly bar past it — one account, two
   opposite readings — so the README now opens on that contrast instead of the old

@@ -38,8 +38,8 @@ class CodexProvider:
 
     def __init__(
         self,
-        command: str = "codex-nowin",
-        proxy: str | None = "http://127.0.0.1:7890",
+        command: str = "codex",
+        proxy: str | None = None,
         sessions_dir: str = "~/.codex/sessions",
         app_server_timeout_seconds: float = 30,
         app_server_max_failures: int = 3,
@@ -101,12 +101,41 @@ class CodexProvider:
             raise _RpcProtocolError("rate-limit result is not an object")
         return payload
 
-    async def _rpc_call(self) -> dict[str, Any]:
-        """拉起 app-server 并完成一次 rateLimits JSON-RPC 查询。"""
+    # 无条件清理的代理变量：http/https/all/no 的大小写共八项
+    _PROXY_ENV_VARS = (
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+    )
+
+    def _subprocess_env(self) -> dict[str, str]:
+        """构造 app-server 子进程环境。
+
+        先无条件清掉全部代理变量（含 NO_PROXY），再由配置决定写什么——
+        ``os.environ.copy()`` 复制的是完整父环境，只覆盖 http/https 四项的话，
+        父环境的 NO_PROXY=* 会直接绕过配置的代理，ALL_PROXY 也会暗中生效，
+        「非空 proxy = 使用该代理」的承诺就失效了。
+
+        清掉 NO_PROXY 意味着 app-server 的全部流量都走配置的代理：
+        这对「只连厂商 API」的用途是正确的，也是维持
+        「配置值唯一决定代理」语义的必要条件。
+        """
         env = os.environ.copy()
+        for key in self._PROXY_ENV_VARS:
+            env.pop(key, None)
         if self._proxy is not None:
             for key in ("https_proxy", "http_proxy", "HTTPS_PROXY", "HTTP_PROXY"):
                 env[key] = self._proxy
+        return env
+
+    async def _rpc_call(self) -> dict[str, Any]:
+        """拉起 app-server 并完成一次 rateLimits JSON-RPC 查询。"""
+        env = self._subprocess_env()
 
         proc: asyncio.subprocess.Process | None = None
         completed = False
