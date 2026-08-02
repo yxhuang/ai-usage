@@ -338,21 +338,12 @@ setInterval(loadSummary, 60000);
 setInterval(repaint, 30000);
 
 function wireSettings() {
-  const toggle = document.getElementById("settings-toggle");
-  const body = document.getElementById("settings-body");
   const box = document.getElementById("hook-switch");
   const note = document.getElementById("hook-note");
-  if (!toggle || !body || !box || !note) return; // 旧页面，静默跳过
-
-  toggle.addEventListener("click", () => {
-    const open = body.hidden;
-    body.hidden = !open;
-    toggle.setAttribute("aria-expanded", String(open));
-    if (open) loadHook();
-    fitWindowToContent(); // 展开/收起会改变内容高度
-  });
+  if (!box || !note) return; // 旧页面，静默跳过
 
   box.addEventListener("change", (e) => setHook(e.currentTarget.checked));
+  loadHook();
 }
 
 wireSettings();

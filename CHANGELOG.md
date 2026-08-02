@@ -23,9 +23,14 @@ the logs said why.
   it behaves exactly like the old `python -m server.main`.
 - **Start-with-your-editor, with a switch** ([`deploy/vscode-hook.sh`](deploy/vscode-hook.sh)).
   Opening VS Code makes sure the daemon is up and brings the panel window out; closing the
-  editor is left alone. `--enable` / `--disable` / `--status` control it, and the state *is*
-  a flag file at `~/.config/ai-usage/vscode-hook.disabled` — nothing else is written to your
-  system. Calling it repeatedly does not open a second window.
+  editor is left alone. Calling it repeatedly does not open a second window.
+
+  The toggle sits at the bottom of the panel under a divider — not behind a disclosure,
+  because a single setting hidden behind a "Settings" link is a setting nobody finds. If the
+  hook isn't installed the panel says so instead of offering a control that does nothing.
+  `--enable` / `--disable` / `--status` read and write the same state, which *is* a flag file
+  at `~/.config/ai-usage/vscode-hook.disabled` — nothing else is written to your system.
+  Delete the file by hand and the panel reflects that on its next read.
 
   There is deliberately no login/boot autostart. You are not necessarily working when the
   machine boots; you almost certainly are when you open an editor. If you do want it at

@@ -17,15 +17,11 @@
   <div id="error-banner" class="error-banner" hidden></div>
   <main id="cards"></main>
   <footer class="settings">
-    <button id="settings-toggle" type="button" class="settings-toggle"
-            aria-expanded="false" aria-controls="settings-body">设置</button>
-    <div id="settings-body" class="settings-body" hidden>
-      <label class="setting-row">
-        <input type="checkbox" id="hook-switch">
-        <span class="setting-label">跟随编辑器启动</span>
-      </label>
-      <p id="hook-note" class="setting-note"></p>
-    </div>
+    <label class="setting-row">
+      <input type="checkbox" id="hook-switch">
+      <span class="setting-label">跟随 VSCode 启动</span>
+    </label>
+    <p id="hook-note" class="setting-note"></p>
   </footer>
   <script src="/static/app.js"></script>
 </body>

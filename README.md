@@ -154,7 +154,7 @@ VS Code brings the panel out, closing it is left alone.
 make sure the daemon is up (starting it if not), open the panel window. Calling it again
 does not open a second window.
 
-The switch lives in the panel: expand **设置** at the bottom and it is the first row. If the
+The switch sits at the bottom of the panel, under a divider: **跟随 VSCode 启动**. If the
 hook isn't installed it says so rather than offering a toggle that does nothing.
 
 The CLI reads and writes the same state:

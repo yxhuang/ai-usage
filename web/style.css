@@ -295,35 +295,12 @@ main {
   }
 }
 
-/* 设置区：默认收起。面板只有节奏刻度一个记忆点，这里不该抢戏——
-   所以是一行灰字按钮，不是显眼的齿轮图标。 */
+/* 设置区：面板底部一行，跟卡片之间用一道分隔线隔开。
+   只有一个设置项，不套折叠——藏在"设置"按钮后面的结果是没人找得到。 */
 .settings {
-  margin-top: 4px;
-  padding: 0 2px 2px;
-}
-
-.settings-toggle {
-  background: none;
-  border: none;
-  padding: 4px 2px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--ink-faint);
-  cursor: pointer;
-}
-
-.settings-toggle:hover {
-  color: var(--ink-muted);
-}
-
-.settings-toggle:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.settings-body {
-  padding: 6px 2px 2px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
 .setting-row {
@@ -338,19 +315,24 @@ main {
   width: 15px;
   height: 15px;
   cursor: pointer;
+  flex: none;
 }
 
 .setting-row input[type="checkbox"]:disabled {
   cursor: default;
 }
 
-.setting-label {
-  font-size: 13px;
+.setting-row:hover .setting-label {
   color: var(--ink);
 }
 
+.setting-label {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
 .setting-note {
-  margin: 4px 0 0 23px;
+  margin: 3px 0 0 23px;
   font-size: 12px;
   color: var(--ink-faint);
   line-height: 1.45;
