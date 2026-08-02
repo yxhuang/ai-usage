@@ -10,7 +10,7 @@
 > | v2 | 需修改后开工 | 新增 3 阻断，其中 2 项是 v2 自己引入的**内部矛盾** |
 > | v3 | 需修改后开工 | 4 阻断：归属认定、状态模型、补偿顺序、配置快照在半数平台无处可放 |
 > | v4 | 需修改后开工 | 3 处**契约断口**（评审语：「完成这三处后即可开工」） |
-> | v5 | 本文 | 补齐三处断口，见文末〈评审项处置对照〉 |
+> | v5 | **可以开工** | 断口已补齐；第五轮的修正与 7 条实现注意事项已折入本文 |
 >
 > **v4 被指出的三处断口**（都是我留下的缺口，不是方向问题）：
 > 1. **`can_disable` 关不掉**。它只认「存在 owned 文件」，转移表却要求「文件已删、
@@ -110,6 +110,10 @@ class ConfigSource:
 - `cli` / `env` → artifact 里写 `--config <绝对路径>`（这是用户的显式选择，必须固化）
 - `repo_default` / `builtin` → **不写 `--config`**。artifact 已经设了工作目录为项目根，
   下次登录会解析到同一份 `config.toml`，写死反而在用户日后删掉该文件时变成硬错误。
+
+  ⚠️ 这是**有意的动态行为**：不固化路径意味着下次登录会重新解析隐式来源。
+  用户后来新建/删除仓库根的 `config.toml`，行为就会跟着变。文档里要如实说明，
+  **不承诺**「环境变化后仍一定用同一来源」。
 
 ### 〇.2 strict 语义只加在入口，不改 `load_config()`
 
@@ -293,6 +297,7 @@ class ArtifactStatus:
     configured_for_next_login: bool | None   # None = 查不出
     active_now: bool | None
     installation_state: str | None   # systemd 的原始 UnitFileState，原样保留供 UI 与排障
+    confidence: str | None           # 仅 kind == "legacy_unit"：confirmed | uncertain（§1.4）
     detail: str | None
 
 @dataclass
@@ -380,8 +385,10 @@ Windows 上 `pythonw.exe` 事后消失会让 `supported=False`，遗留的 `.lnk
 <python> -I -B -c "<固定 bootstrap>" <project_root> [<config_path>]
 ```
 
-bootstrap 自己 `sys.path.insert(0, sys.argv[1])` 之后再导入 `server.config` 并
-`load_config(sys.argv[2], strict=True)`，成功打印约定字样、失败非零退出。
+bootstrap 自己 `sys.path.insert(0, sys.argv[1])` 之后再导入 `server.config`，
+成功打印约定字样、失败非零退出。**`<config_path>` 是可选参数**——`origin` 为
+`repo_default`/`builtin` 时 artifact 里本来就没有 `--config`，bootstrap 不得无条件读
+`sys.argv[2]`，缺参时按无显式配置处理。
 
 `status()` **任何情况下不抛异常**，查询失败进 `query_errors`，其余维度照常返回。
 
@@ -404,9 +411,17 @@ bootstrap 自己 `sys.path.insert(0, sys.argv[1])` 之后再导入 `server.confi
 | `legacy_unit` | — | 任意 | 拒绝，给 §1.4 的说明 | 不适用（不是本功能的东西） |
 
 **「残留注册」只指 systemd。** systemd 的 enable symlink 独立于 unit 文件存在，unit 删了
-symlink 可能还在（`daemon-reload` 失败时就会这样），此时下次登录仍会尝试启动，
-所以必须清。判定安全的条件：symlink 的目标文件名正是 `ai-usage-autostart.service`
-（即指向我们的名字），且它位于用户 unit 目录下的 `.wants` 里。
+symlink 可能还在（`daemon-reload` 失败时就会这样），此时下次登录仍会尝试启动，所以必须清。
+
+判定为 `owned` 需**同时**满足，任一不符即 `foreign`（不动它）：
+
+- symlink 位于用户 unit 目录下的 `default.target.wants/`（位置精确匹配，不是「某个 .wants」）
+- 文件名正是 `ai-usage-autostart.service`
+- **不存在**同名的 foreign unit 文件（否则这条 symlink 可能是别人的）
+
+它的 `configured_for_next_login` 取 `True`——一条有效的 `.wants` symlink 本身就足以让
+systemd 在下次登录时尝试启动该 unit（unit 文件缺失会启动失败，但那是 `freshness` 的事，
+不是「不会尝试」）。这样 §3 顶层 `enabled` 的三值 OR 才有确定输入，不会落进未定义状态。
 
 **launchd 不属于这一类**——v4 曾把「plist 已删、job 仍在 launchd 里」也写成必须清理的
 残留，与 §4「阶段一不 bootout」直接冲突。正确理解是：已加载的 job 只表示
@@ -464,7 +479,8 @@ WantedBy=default.target
 写在 `[Service]` 里会被当未知键忽略，限流就失效了。测试须对生成的文件跑
 `systemd-analyze verify`。
 
-写入后 `daemon-reload` + `systemctl --user enable`，**不加 `--now`**（§5）。
+写入后 `daemon-reload` + `systemctl --user --no-reload enable`，**不加 `--now`**（§5）。
+`--no-reload` 的理由见 §6.2：systemctl 默认的隐式 reload 会打乱分步失败模型。
 
 ### macOS
 
@@ -549,6 +565,8 @@ v4 的承诺是「尽力恢复 + 如实上报」，并把恢复顺序写死。
   `install.sh` 用 `flock(1)` 锁**同一路径**（`flock -n <path> -c ...`），两边才是同一把锁
 - 路径里**不含 checkout 信息**——每用户一把，跨 checkout、跨 backend 共用（否则两份
   checkout 各锁各的，照样能同时写出两个 unit）
+- 路径解析必须是**同一份逻辑**：Python 侧写成一个函数，`install.sh` 用等价的几行 shell，
+  两边都要测 `$XDG_RUNTIME_DIR` 已设与未设两种情况——否则「同一把锁」只是口头承诺
 
 **规则**：
 
@@ -584,14 +602,22 @@ v4 的承诺是「尽力恢复 + 如实上报」，并把恢复顺序写死。
 | 步骤 | 前向 | 失败时怎么办 |
 |---|---|---|
 | ① | 快照文件内容+元数据+注册状态 | — |
-| ② | `systemctl --user disable`（撤注册） | 状态尚未改变，直接返回错误，无需补偿 |
-| ③ | 删除 unit 文件 | **重新 `enable` 恢复原注册**，回到操作前状态 |
+| ② | `systemctl --user --no-reload disable`（撤注册） | 状态尚未改变，直接返回错误，无需补偿 |
+| ③ | 删除 unit 文件 | **按 ① 的注册快照恢复**：原来是 enabled 才重新 enable；原来就是 disabled 的**不得**反而启用 |
 | ④ | `daemon-reload` | **不回滚**——文件已删就是目标状态，回滚反而更糟。写 `issues` 并返回可重试 |
 | ⑤ | 复查 `.wants` 里是否还有指向我们的 symlink，有则清理 + 再 `daemon-reload` | 写 `issues`，返回 `recovery_required` |
 
-⚠️ ② 必须在 ③ **之前**：`systemctl disable` 需要 unit 文件在场才能解析 `[Install]` 并正确
-移除 symlink。文件先删了再 disable，symlink 就可能留下来——这正是 ⑤ 存在的原因，
-也是 §3 把残留注册单独建模的原因。
+⚠️ **所有 `enable`/`disable` 都必须带 `--no-reload`**。systemctl 默认会隐式做一次 manager
+reload，那会破坏上表分步的失败模型：② 可能已经撤掉了 symlink，却因隐式 reload 失败而返回
+错误，与「状态尚未改变」矛盾。§4 的 enable 流程同理。
+
+② 在 ③ **之前**的理由是**回滚更简单**（服务管理器侧的变更先做完，文件还在，撤销代价最小）。
+
+> 早期版本写的理由是「unit 文件缺失时 `systemctl disable` 无法移除 symlink」——**这个说法
+> 不成立**：systemd 找不到 unit 文件时把 `ENOENT` 当非致命，仍会按 unit 名扫描配置目录
+> 并删除匹配的 symlink。顺序保留，理由更正。
+
+⑤ 仍然必要：④ 失败留下的半成品状态、以及用户手工删文件造成的残留，都要靠它收口。
 
 ④ 失败后是「文件已删、systemd 内存里还有旧 unit」的半成品状态。下次 `disable()` 会看到
 `absent` + 可能的残留注册，按 §3 转移表继续收尾——**所以 `absent` 不能无脑 no-op**。
@@ -851,6 +877,21 @@ X-Frame-Options: DENY
 | 锁身份未固定 | §6.1：写死路径、`flock` 协议、Windows mutex 名，`install.sh` 用 `flock(1)` 锁同一路径 |
 | `installation_state` 原始值应保留 | §3：`ArtifactStatus` 增加该字段 |
 | marker 不防同 UID 恶意进程 | 已接受：marker 防的是**命名碰撞与意外篡改**，不防已获得用户文件写权限的进程——那种情况下攻击者本就能直接改这些文件。不引入签名系统 |
+
+### 第五轮（对 v5）：判「可以开工」，修正与注意事项已折入正文
+
+| 意见 | 落点 |
+|---|---|
+| 「unit 缺失则 disable 删不掉 symlink」的理由**不成立**（systemd 把 ENOENT 当非致命，仍按名扫目录删链接） | §6.2：顺序保留，理由改为「回滚更简单」，并保留了原说法的更正记录 |
+| `systemctl enable/disable` 默认隐式 reload，会打乱分步失败模型 | §4 与 §6.2：一律加 `--no-reload` |
+| `ArtifactStatus` 缺 legacy 的确信度字段 | §3：新增 `confidence: confirmed \| uncertain` |
+| `systemd_registration.configured_for_next_login` 取值未定义 | §3：定为 `True`，并说明理由（有效 symlink 足以让 systemd 尝试启动） |
+| 残留 symlink 判 owned 的条件太松 | §3：三条件——位置精确在 `default.target.wants/`、文件名匹配、无同名 foreign unit |
+| 删文件失败的补偿可能反而启用原本 disabled 的 unit | §6.2 步骤 ③：改为「按注册快照恢复」 |
+| probe 的 `<config_path>` 是可选参数 | §3 probe 段：明确缺参时的行为 |
+| `repo_default`/`builtin` 不固化路径 = 动态行为 | §〇.1：标为有意为之，并要求文档不作「来源不变」的承诺 |
+| 锁路径解析需两端同源 | §6.1：要求同一份逻辑 + 两种 `$XDG_RUNTIME_DIR` 状态都测 |
+| launchd 论断在本方案范围内准确，但不可泛化 | 已接受：结论成立的前提是**坚持不调用** `bootstrap`/`SMAppService.register()`/`launchctl enable`，§4/§5 已明确禁止 |
 
 ### 前两轮遗留（复审已判通过的不再重复）
 
