@@ -8,7 +8,9 @@
 
 把 Claude、Codex、Kimi 三家的订阅额度显示在同一个小窗口里。
 
-[English](../README.md) | 简体中文 · [更新日志](CHANGELOG.zh-CN.md)
+[English](../README.md) | 简体中文
+
+**更新日志：**[简体中文](CHANGELOG.zh-CN.md) · [English](../CHANGELOG.md)
 
 三家的额度分别在各自的后台，平时都不提示，等你注意到的时候一般已经被限流了。
 这个工具把三家的数字读出来，放在一个常开的小面板上。

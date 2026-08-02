@@ -9,7 +9,9 @@
 
 **Three AI subscriptions. One small window. Know before you hit the wall.**
 
-English | [简体中文](docs/README.zh-CN.md) · [Changelog](CHANGELOG.md)
+English | [简体中文](docs/README.zh-CN.md)
+
+**Changelog:** [English](CHANGELOG.md) · [简体中文](docs/CHANGELOG.zh-CN.md)
 
 If you pay for Claude Pro, ChatGPT Plus, and a Kimi plan, your quota lives in three
 places and none of them tell you anything until you're already rate-limited. `ai-usage`

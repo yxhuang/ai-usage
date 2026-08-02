@@ -10,10 +10,14 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
 
 ## [0.3.0] — 2026-08-02
 
-Fallout from a real incident: a proxy's TUN mode was switched on without the user noticing,
-it took over the default route, and the Kimi provider timed out for hours. The provider
-itself was fine — but recovering from it took far longer than it should have, and nothing in
-the logs said why.
+Two themes. First, the project stops assuming it is running on the author's machine — the
+shipped defaults were one specific developer setup, so a fresh clone could reach none of the
+three providers. Second, a start-with-your-editor switch, with the panel UI to control it.
+
+The backoff and logging changes come out of a real incident: a proxy's TUN mode got switched
+on unnoticed, took over the default route, and the Kimi provider timed out for hours. The
+provider was fine. Recovering took far longer than it should have, and nothing in the logs
+said why.
 
 ### Added
 
@@ -25,10 +29,11 @@ the logs said why.
   Opening VS Code makes sure the daemon is up and brings the panel window out; closing the
   editor is left alone. Calling it repeatedly does not open a second window.
 
-  The toggle lives behind the gear left of the title. Settings are a *view* that replaces the
-  cards rather than a section below them — appended at the bottom, they fall outside a small
-  window as soon as the cards fill it. If the hook isn't installed the panel says so instead
-  of offering a control that does nothing.
+  The toggle lives behind a gear to the left of the title. Settings are a *view* that
+  replaces the cards rather than a section below them: appended at the bottom, they drop out
+  of sight the moment the cards fill a small window — which is exactly what happened before
+  this was moved. The gear is the home for whatever settings come later. If the hook isn't
+  installed the panel says so instead of offering a control that does nothing.
   `--enable` / `--disable` / `--status` read and write the same state, which *is* a flag file
   at `~/.config/ai-usage/vscode-hook.disabled` — nothing else is written to your system.
   Delete the file by hand and the panel reflects that on its next read.
@@ -86,13 +91,18 @@ the logs said why.
 
 ### Fixed
 
+- **The settings UI is built by `app.js`, not written into `index.html`.** This one bit
+  twice, from the same root cause: UI markup lived in a file browsers cache, while the
+  script that drives it carries `no-cache` and is always fresh. New script against old DOM.
+  First it threw during wiring and took the whole panel down — a blank window with the data
+  layer working perfectly behind it. Null-guarding stopped the crash, so the second time it
+  failed silently instead: the gear simply never appeared, and no amount of reloading helped,
+  because the cached HTML never had it. Whichever side is guaranteed fresh should own the
+  elements, so now the script creates them. `index.html` stays a skeleton.
 - **`/` (index.html) is served with `Cache-Control: no-cache` too.** Only `/static` had it;
-  the page itself, the one entry point that matters most, was missed. Adding the settings
-  section made that fatal: the browser reused the cached HTML while loading the fresh
-  `app.js`, the new script could not find the settings elements in the old DOM, and the
-  resulting exception happened *before* `loadSummary()` — so not a single card rendered.
-  The script was hardened as well: the main panel is wired and fetched first, settings last
-  and null-guarded, so a stale page costs you the settings section and nothing else.
+  the page itself, the one entry point that matters most, was missed. Necessary, but note it
+  only fixes *future* loads — a copy already sitting in the browser cache is beyond its
+  reach, which is why the fix above was the one that actually settled it.
 - **Static assets are served with `Cache-Control: no-cache`.** The panel is a long-lived
   Chrome `--app` window, which serves CSS out of its in-memory cache and does not
   revalidate on an ordinary reload — so a style change could be live on disk, correct in
