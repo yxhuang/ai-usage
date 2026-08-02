@@ -341,13 +341,77 @@ loadSummary();
 setInterval(loadSummary, 60000);
 setInterval(repaint, 30000);
 
-function wireSettings() {
-  const btn = document.getElementById("settings-btn");
-  const panel = document.getElementById("settings");
+const GEAR_SVG =
+  '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" ' +
+  'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<circle cx="12" cy="12" r="3"></circle>' +
+  '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 ' +
+  '1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 ' +
+  '19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 ' +
+  '.33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 ' +
+  '0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 ' +
+  '0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 ' +
+  '2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 ' +
+  '0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
+
+/* 齿轮和设置视图都由脚本生成，不依赖 index.html 里有没有它们。
+ *
+ * 页面本身会被浏览器缓存，而 /static/app.js 带 no-cache 永远是新的。把界面元素写死在
+ * HTML 里，就会出现「新脚本 + 旧 DOM」——轻则功能静默消失（用户以为没做），
+ * 重则接线时抛异常把整个面板带崩。两种都真踩过。
+ * 让永远最新的那一方负责建元素，这个版本错配就不存在了。 */
+function buildSettingsUI() {
+  const header = document.querySelector("header");
   const cards = document.getElementById("cards");
+  if (!header || !cards) return null;
+
+  let btn = document.getElementById("settings-btn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "settings-btn";
+    btn.type = "button";
+    btn.className = "gear";
+    btn.title = "设置";
+    btn.setAttribute("aria-label", "设置");
+    btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = GEAR_SVG; // 固定常量，不含任何外部数据
+    header.prepend(btn);
+  }
+
+  let panel = document.getElementById("settings");
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "settings";
+    panel.className = "settings";
+    panel.hidden = true;
+
+    const row = document.createElement("label");
+    row.className = "setting-row";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.id = "hook-switch";
+    const label = document.createElement("span");
+    label.className = "setting-label";
+    label.textContent = "跟随 VSCode 启动";
+    row.append(box, label);
+
+    const note = document.createElement("p");
+    note.id = "hook-note";
+    note.className = "setting-note";
+
+    panel.append(row, note);
+    cards.after(panel);
+  }
+  return { btn, panel, cards };
+}
+
+function wireSettings() {
+  const built = buildSettingsUI();
+  if (!built) return;
+  const { btn, panel, cards } = built;
   const box = document.getElementById("hook-switch");
   const note = document.getElementById("hook-note");
-  if (!btn || !panel || !cards || !box || !note) return; // 旧页面，静默跳过
+  if (!box || !note) return;
 
   btn.addEventListener("click", () => {
     const open = panel.hidden;
