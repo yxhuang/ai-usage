@@ -154,7 +154,10 @@ VS Code brings the panel out, closing it is left alone.
 make sure the daemon is up (starting it if not), open the panel window. Calling it again
 does not open a second window.
 
-The switch applies to every setup below:
+The switch lives in the panel: expand **设置** at the bottom and it is the first row. If the
+hook isn't installed it says so rather than offering a toggle that does nothing.
+
+The CLI reads and writes the same state:
 
 ```bash
 deploy/vscode-hook.sh --status     # where things stand
@@ -245,7 +248,7 @@ Everything is optional — see [config.example.toml](config.example.toml). Witho
 ## Development
 
 ```bash
-uv run pytest      # 100 tests; no network, no real credentials
+uv run pytest      # 115 tests; no network, no real credentials
 ```
 
 Tests build responses and fake credentials with `httpx.MockTransport` and temp directories.
@@ -256,7 +259,7 @@ a real credential.
 
 ## Status
 
-Early, and honest about it. The logic is covered by 100 offline tests, but it has only run on
+Early, and honest about it. The logic is covered by 115 offline tests, but it has only run on
 one machine so far. If a provider's response shape differs on your account — a different
 plan tier, a different region — a bug report with the (redacted) payload would genuinely
 help.

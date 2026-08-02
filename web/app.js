@@ -264,16 +264,83 @@ async function load(url, options, failMsg) {
 
 const loadSummary = () => load("/api/summary", undefined, "获取数据失败，下面是上一次的结果");
 
+/* 会改状态的请求都要带这个头。服务端拿它当主防线：跨域请求带非 safelisted 自定义头
+ * 必然触发预检，而服务端不返回任何 CORS 头，预检必失败——恶意网页发不出这种请求。 */
+const MUTATE_HEADERS = { "X-Requested-By": "ai-usage-panel" };
+
 async function refreshAll() {
   const btn = document.getElementById("refresh-btn");
   btn.disabled = true;
   try {
-    await load("/api/refresh?provider=all", { method: "POST" },
+    await load("/api/refresh?provider=all",
+      { method: "POST", headers: MUTATE_HEADERS },
       "刷新失败，下面是上一次的结果");
   } finally {
     btn.disabled = false;
   }
 }
+
+/* ---- 设置：跟随编辑器启动 ---- */
+
+function renderHook(s) {
+  document.getElementById("hook-switch").checked = s.enabled;
+  const note = document.getElementById("hook-note");
+  if (!s.hook_installed) {
+    note.textContent = "未检测到编辑器钩子，开关暂时不起作用。装法见 README。";
+    note.className = "setting-note warn";
+  } else {
+    note.textContent = s.enabled
+      ? "打开 VSCode 时自动开出面板。"
+      : "已关闭，打开 VSCode 不会自动开面板。";
+    note.className = "setting-note";
+  }
+}
+
+async function loadHook() {
+  try {
+    const resp = await fetch("/api/vscode-hook");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    renderHook(await resp.json());
+  } catch (e) {
+    const note = document.getElementById("hook-note");
+    note.textContent = "读不到开关状态。";
+    note.className = "setting-note warn";
+  }
+}
+
+async function setHook(enabled) {
+  const box = document.getElementById("hook-switch");
+  box.disabled = true;
+  try {
+    const resp = await fetch("/api/vscode-hook", {
+      method: "PUT",
+      headers: { ...MUTATE_HEADERS, "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    renderHook(await resp.json());
+  } catch (e) {
+    box.checked = !enabled; // 没改成就退回原状，别让界面撒谎
+    const note = document.getElementById("hook-note");
+    note.textContent = "改不动这个开关，看看 daemon 日志。";
+    note.className = "setting-note warn";
+  } finally {
+    box.disabled = false;
+  }
+}
+
+document.getElementById("settings-toggle").addEventListener("click", (e) => {
+  const body = document.getElementById("settings-body");
+  const open = body.hidden;
+  body.hidden = !open;
+  e.currentTarget.setAttribute("aria-expanded", String(open));
+  if (open) loadHook();
+  fitWindowToContent(); // 展开/收起会改变内容高度
+});
+
+document.getElementById("hook-switch").addEventListener("change", (e) => {
+  setHook(e.currentTarget.checked);
+});
 
 document.getElementById("refresh-btn").addEventListener("click", refreshAll);
 loadSummary();

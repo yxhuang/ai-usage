@@ -28,13 +28,21 @@
   一致。
 - **跟随编辑器启动，带开关**（[`deploy/vscode-hook.sh`](../deploy/vscode-hook.sh)）。
   打开 VSCode 时确认 daemon 在跑并把面板窗口带出来，关掉编辑器就不管。
-  `--enable` / `--disable` / `--status` 三个子命令控制开关，状态就是一个标志文件
+  开关做在面板里：底部「设置」展开即可切换，钩子没装时会直说而不是给一个点了没用的
+  开关。命令行的 `--enable` / `--disable` / `--status` 读写同一个状态。状态就是一个标志文件
   `~/.config/ai-usage/vscode-hook.disabled`，除它之外脚本不往系统里写任何东西。
   重复调用不会开出第二个窗口。
 
   没有做开机自启：开机时未必要干活，而打开编辑器基本等于要干活了。真想要开机自启的话，
   各系统自带的机制（`shell:startup`、登录项、systemd unit）已经够用，
   没必要再包一层。
+
+- **写操作端点加了防护。** `PUT /api/vscode-hook` 和原有的 `POST /api/refresh` 现在要过
+  三道校验：Host 必须是本机回环地址（挡 DNS rebinding）、必须带 `X-Requested-By` 自定义头、
+  Origin 必须存在且匹配。第二道是主防线：跨域请求带非 safelisted 自定义头必然触发预检，
+  而本服务不注册任何 CORS 中间件，预检必然失败。另外所有响应都下发
+  `Content-Security-Policy: frame-ancestors 'none'` 和 `X-Frame-Options: DENY`，
+  防止把面板套进透明 iframe 骗你点开关——那种攻击里请求由面板自己发出，前三道全都合法。
 
 ### 变更
 
@@ -86,7 +94,7 @@
 
 ### 说明
 
-- 100 项离线测试（上一版 87 项），新增覆盖配置来源解析、`--config` 的严格语义、
+- 115 项离线测试（上一版 87 项），新增覆盖配置来源解析、`--config` 的严格语义、
   以及新的入口。
 
 ## [0.2.0] — 2026-07-27

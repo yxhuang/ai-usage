@@ -7,13 +7,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import vscode_hook
 from .cache import Cache
 from .config import Config, ConfigSource, load_config, resolve_config
 from .poller import Poller
+from .security import SecurityHeadersMiddleware, require_local_ui
 from .providers.base import Provider
 from .providers.claude import ClaudeProvider
 from .providers.codex import CodexProvider
@@ -91,6 +93,7 @@ def create_app(
 
     app = FastAPI(lifespan=lifespan)
     app.state.config_source = source
+    app.add_middleware(SecurityHeadersMiddleware)
 
     def summary_payload() -> dict:
         stale_after = cfg.poller.stale_after_seconds
@@ -111,7 +114,7 @@ def create_app(
     async def get_summary():
         return summary_payload()
 
-    @app.post("/api/refresh")
+    @app.post("/api/refresh", dependencies=[Depends(require_local_ui)])
     async def post_refresh(provider: str = Query("all")):
         if provider != "all":
             known = {p.id for p in providers}
@@ -121,6 +124,18 @@ def create_app(
         else:
             await poller.refresh(None)
         return summary_payload()
+
+    @app.get("/api/vscode-hook")
+    async def get_vscode_hook():
+        return vscode_hook.status().to_dict()
+
+    @app.put("/api/vscode-hook", dependencies=[Depends(require_local_ui)])
+    async def put_vscode_hook(enabled: bool = Body(..., embed=True)):
+        # PUT 而非 POST：非简单方法，跨域时必定触发预检
+        try:
+            return vscode_hook.set_enabled(enabled).to_dict()
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"写入失败：{exc}") from exc
 
     # 面板是常驻窗口，改完样式要能立刻看见。Chrome 的 --app 窗口会直接吃内存缓存、
     # 普通刷新都不回源，所以显式要求每次都revalidate——本来就是回环地址，不费什么。

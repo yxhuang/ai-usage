@@ -32,6 +32,15 @@ the logs said why.
   login, each OS already has a mechanism for that (`shell:startup`, Login Items, a systemd
   unit) and wrapping another layer around them was not worth it.
 
+- **State-changing endpoints are now guarded.** `PUT /api/vscode-hook` and the existing
+  `POST /api/refresh` require a loopback `Host` (against DNS rebinding), an
+  `X-Requested-By` custom header, and a present, matching `Origin`. The custom header is
+  the real barrier: a cross-origin request carrying a non-safelisted header must preflight,
+  and this server registers no CORS middleware, so the preflight always fails. Every
+  response also carries `Content-Security-Policy: frame-ancestors 'none'` and
+  `X-Frame-Options: DENY` — without those, a transparent iframe could get you to click the
+  real toggle, and that request would pass all three checks legitimately.
+
 ### Changed
 
 - **Default configuration is now generic — breaking if you relied on the built-in
@@ -95,7 +104,7 @@ the logs said why.
 
 ### Notes
 
-- 100 offline tests (up from 87), including coverage of the new backoff schedule, the
+- 115 offline tests (up from 87), including coverage of the new backoff schedule, the
   proxy semantics (normalization, env-var isolation, subprocess environment scrubbing),
   config-source resolution, and the strict `--config` semantics.
 - A cross-platform login-autostart toggle was designed in full and then **dropped before
