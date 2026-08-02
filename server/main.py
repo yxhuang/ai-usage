@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .cache import Cache
-from .config import Config, load_config
+from .config import Config, ConfigSource, load_config, resolve_config
 from .poller import Poller
 from .providers.base import Provider
 from .providers.claude import ClaudeProvider
@@ -67,8 +67,11 @@ def build_providers(cfg: Config) -> list[Provider]:
     return providers
 
 
-def create_app(cfg: Config | None = None) -> FastAPI:
-    cfg = cfg or load_config()
+def create_app(
+    cfg: Config | None = None, source: ConfigSource | None = None
+) -> FastAPI:
+    if cfg is None:
+        cfg = load_config()
     cache = Cache()
     providers = build_providers(cfg)
     poller = Poller(providers, cfg.poller, cache)
@@ -87,6 +90,7 @@ def create_app(cfg: Config | None = None) -> FastAPI:
                 pass
 
     app = FastAPI(lifespan=lifespan)
+    app.state.config_source = source
 
     def summary_payload() -> dict:
         stale_after = cfg.poller.stale_after_seconds
@@ -130,11 +134,9 @@ def create_app(cfg: Config | None = None) -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
-    cfg = load_config()
+    cfg, source = resolve_config()
+    app = create_app(cfg, source)
     uvicorn.run(app, host=cfg.server.host, port=cfg.server.port)
 
 

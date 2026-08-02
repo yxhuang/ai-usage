@@ -1,4 +1,4 @@
-"""读取仓库根 config.toml；文件不存在时用内置默认值（常态）。"""
+"""解析配置内容与来源；没有配置文件时使用内置默认值。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,12 @@ DEFAULT_CONFIG_PATH = REPO_ROOT / "config.toml"
 
 # 安全红线：服务处理凭证数据，只允许绑回环地址
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+@dataclass(frozen=True)
+class ConfigSource:
+    path: Path | None
+    origin: str
 
 
 @dataclass
@@ -71,14 +77,32 @@ class Config:
     )
 
 
-def load_config(path: Path | None = None) -> Config:
+def load_config(path: Path | None = None, *, strict: bool = False) -> Config:
     cfg = Config()
     if path is None:
         env = os.environ.get("AI_USAGE_CONFIG")
         path = Path(env) if env else DEFAULT_CONFIG_PATH
     if not path.exists():
+        if strict:
+            raise FileNotFoundError(f"配置文件不存在: {path}")
         return cfg
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    if strict and not path.is_file():
+        raise OSError(f"配置路径不是普通文件: {path}")
+    if strict and not os.access(path, os.R_OK):
+        raise PermissionError(f"配置文件不可读: {path}")
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        if strict:
+            raise OSError(f"配置文件不可读: {path}: {exc}") from exc
+        raise
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        if strict:
+            raise ValueError(f"配置文件 TOML 解析失败: {path}: {exc}") from exc
+        raise
 
     server = data.get("server", {})
     cfg.server.host = server.get("host", cfg.server.host)
@@ -119,6 +143,30 @@ def load_config(path: Path | None = None) -> Config:
         if "proxy" in pconf.options:
             pconf.options["proxy"] = _normalize_proxy(pid, pconf.options["proxy"])
     return cfg
+
+
+def resolve_config(
+    cli_path: str | Path | None = None,
+) -> tuple[Config, ConfigSource]:
+    """按 cli、环境变量、仓库默认、内置默认的顺序解析配置。"""
+    if cli_path is not None:
+        path = _absolute_path(cli_path)
+        return load_config(path, strict=True), ConfigSource(path=path, origin="cli")
+
+    env_path = os.environ.get("AI_USAGE_CONFIG")
+    if env_path:
+        path = _absolute_path(env_path)
+        return load_config(path, strict=True), ConfigSource(path=path, origin="env")
+
+    if DEFAULT_CONFIG_PATH.exists():
+        path = _absolute_path(DEFAULT_CONFIG_PATH)
+        return load_config(path), ConfigSource(path=path, origin="repo_default")
+
+    return Config(), ConfigSource(path=None, origin="builtin")
+
+
+def _absolute_path(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve()
 
 
 def _normalize_proxy(pid: str, value: object) -> str | None:
