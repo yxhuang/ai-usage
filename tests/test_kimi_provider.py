@@ -314,3 +314,36 @@ async def test_api_key_file_none_with_explicit_key_ok(tmp_path, monkeypatch):
     usage = await provider.fetch()
     assert usage.status == "ok"
     assert requests[0].headers["Authorization"] == f"Bearer {FAKE_KEY}"
+
+
+async def test_no_key_message_under_systemd(monkeypatch):
+    """以 systemd 服务运行时，必须明说环境变量这条路走不通。"""
+    monkeypatch.setenv("INVOCATION_ID", "deadbeef")
+    monkeypatch.delenv("KIMI_API_KEY", raising=False)
+    provider = KimiProvider()
+    usage = await provider.fetch()
+    assert usage.status == "error"
+    assert "systemd" in usage.error
+    assert "api_key_file" in usage.error
+
+
+async def test_no_key_message_in_plain_shell(monkeypatch):
+    """普通进程里环境变量是可用选项，提示中应保留它。"""
+    monkeypatch.delenv("INVOCATION_ID", raising=False)
+    monkeypatch.delenv("KIMI_API_KEY", raising=False)
+    provider = KimiProvider()
+    usage = await provider.fetch()
+    assert usage.status == "error"
+    assert "systemd" not in usage.error
+    assert "KIMI_API_KEY" in usage.error
+
+
+async def test_key_resolution_priority_unchanged(monkeypatch, tmp_path):
+    """回归护栏：优先级仍是 api_key → 环境变量 → 文件，本次只改文案。"""
+    monkeypatch.setenv("KIMI_API_KEY", "sk-from-env")
+    key_file = tmp_path / "secrets.sh"
+    key_file.write_text('export KIMI_API_KEY="sk-from-file"\n', encoding="utf-8")
+    assert KimiProvider(api_key="sk-direct", api_key_file=str(key_file))._resolve_api_key() == "sk-direct"
+    assert KimiProvider(api_key_file=str(key_file))._resolve_api_key() == "sk-from-env"
+    monkeypatch.delenv("KIMI_API_KEY")
+    assert KimiProvider(api_key_file=str(key_file))._resolve_api_key() == "sk-from-file"

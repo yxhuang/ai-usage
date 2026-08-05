@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
@@ -98,3 +99,8 @@ def error_usage(id: str, name: str, status: str, error: str) -> ProviderUsage:
         error=error,
         fetched_at=datetime.now(timezone.utc),
     )
+
+
+def running_as_service() -> bool:
+    """systemd 拉起的进程会带 INVOCATION_ID；据此判断环境变量那条路是否可用。"""
+    return bool(os.environ.get("INVOCATION_ID"))

@@ -16,14 +16,23 @@ from pathlib import Path
 
 import httpx
 
-from .base import ProviderUsage, UsageWindow, error_usage, parse_dt
+from .base import ProviderUsage, UsageWindow, error_usage, parse_dt, running_as_service
 
 logger = logging.getLogger(__name__)
 
 USAGE_URL = "https://api.kimi.com/coding/v1/usages"
 
+# 提示按可靠性排序：config.toml 两条路在任何运行方式下都成立，环境变量则未必。
 _NO_KEY_MSG = (
-    "未配置 Kimi API key（config.toml 的 api_key / 环境变量 {env} / 配置的密钥文件 三者任一）"
+    "未配置 Kimi API key。请在 config.toml 配 [providers.kimi] api_key，"
+    "或用 api_key_file 指向含该变量的文件，或导出环境变量 {env}"
+)
+# systemd 的 unit 只注入 PATH，读不到用户 shell 里的 export——
+# 此时把环境变量列为选项会让人白折腾一轮，故单独给一份文案。
+_NO_KEY_MSG_SERVICE = (
+    "未配置 Kimi API key。当前以 systemd 服务运行，环境变量 {env} 不会被读到"
+    "（unit 只注入 PATH）。请在 config.toml 配 [providers.kimi] api_key，"
+    "或用 api_key_file 指向含该变量的文件"
 )
 _AUTH_EXPIRED_MSG = "Kimi API key 无效或已过期，请更新 key"
 
@@ -80,8 +89,9 @@ class KimiProvider:
         # 1. 解析 key；三条路都没有直接报错，不发请求
         key = self._resolve_api_key()
         if not key:
+            template = _NO_KEY_MSG_SERVICE if running_as_service() else _NO_KEY_MSG
             return error_usage(
-                self.id, self.name, "error", _NO_KEY_MSG.format(env=self._api_key_env)
+                self.id, self.name, "error", template.format(env=self._api_key_env)
             )
 
         # 2. 请求：默认直连——不传 proxy 且 trust_env=False，只保证不读环境
