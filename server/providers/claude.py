@@ -26,6 +26,11 @@ _KIND_MAP: dict[str, tuple[str, str]] = {
 
 _AUTH_EXPIRED_MSG = "OAuth token 已过期——随便用一次 claude CLI 即自动续期"
 
+_FORBIDDEN_MSG = (
+    "HTTP 403：网络层拒绝，不是登录问题。该网络直连 api.anthropic.com 被拒，"
+    "如需代理请在 config.toml 配 [providers.claude] proxy"
+)
+
 _CURRENCY_SYMBOLS = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥", "CNY": "¥"}
 
 
@@ -138,8 +143,10 @@ class ClaudeProvider:
         except httpx.HTTPError as exc:
             return error_usage(self.id, self.name, "error", f"网络错误: {type(exc).__name__}")
 
-        if resp.status_code in (401, 403):
+        if resp.status_code == 401:
             return error_usage(self.id, self.name, "auth_expired", _AUTH_EXPIRED_MSG)
+        if resp.status_code == 403:
+            return error_usage(self.id, self.name, "error", _FORBIDDEN_MSG)
         if resp.status_code < 200 or resp.status_code >= 300:
             return error_usage(
                 self.id, self.name, "error", f"HTTP {resp.status_code}"

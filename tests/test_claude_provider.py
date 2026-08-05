@@ -252,3 +252,21 @@ async def test_explicit_proxy_passed_through(tmp_path, monkeypatch):
     assert usage.status == "ok"
     assert _CapturingClient.captured.get("proxy") == "http://127.0.0.1:7890"
     assert "trust_env" not in _CapturingClient.captured
+
+
+async def test_403_is_network_error_not_auth_expired(tmp_path):
+    """403 是网络层拒绝，不能报成 token 过期——否则把人引向重新登录。"""
+    provider = _make_provider(tmp_path, status_code=403)
+    usage = await provider.fetch()
+    assert usage.status == "error"
+    assert "403" in usage.error
+    assert "过期" not in usage.error
+    assert "proxy" in usage.error
+
+
+async def test_401_still_reports_auth_expired(tmp_path):
+    """401 才是真的凭证问题，保留原有引导。"""
+    provider = _make_provider(tmp_path, status_code=401)
+    usage = await provider.fetch()
+    assert usage.status == "auth_expired"
+    assert "claude CLI" in usage.error
