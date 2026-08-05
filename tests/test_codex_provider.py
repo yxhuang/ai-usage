@@ -101,7 +101,7 @@ async def test_app_server_failure_falls_back_to_stale_session(tmp_path, failure)
     ).fetch()
 
     assert usage.status == "stale"
-    assert usage.error is None
+    assert usage.error is not None  # 兜底快照必须说明原因（见 test_fallback_explains_why_stale）
     assert usage.plan == "Testplan"
     assert usage.windows[0].id == "week"
     assert usage.windows[0].used_pct == 14.0
@@ -326,3 +326,15 @@ def test_defaults_are_generic():
     provider = CodexProvider()
     assert provider._command == "codex"
     assert provider._proxy is None
+
+
+async def test_fallback_explains_why_stale(tmp_path):
+    """走兜底快照时要说明原因，否则用户只看到「多久前」，以为一切正常。"""
+    _write_session(tmp_path)
+    provider = CodexProvider(sessions_dir=str(tmp_path), rpc_call=_rpc_fail)
+    usage = await provider.fetch()
+
+    assert usage.status == "stale"
+    assert usage.error is not None
+    assert "app-server" in usage.error
+    assert usage.windows, "兜底数据仍应带出额度窗口"

@@ -26,6 +26,10 @@ RpcCall = Callable[[], Awaitable[dict[str, Any]]]
 _FALLBACK_ERROR = (
     "无法获取 Codex 用量：app-server 不可用，且未找到可用的 sessions 限额记录"
 )
+_FALLBACK_NOTE = (
+    "数据来自本地会话快照——app-server 不可用。它需要连 chatgpt.com，"
+    "如需代理请在 config.toml 配 [providers.codex] proxy"
+)
 
 
 class _RpcProtocolError(RuntimeError):
@@ -80,6 +84,8 @@ class CodexProvider:
 
         fallback = self._read_latest_session_usage()
         if fallback is not None:
+            # status 仍是 stale，只借 error 字段把「为什么是旧数据」带给用户
+            fallback.error = _FALLBACK_NOTE
             return fallback
         return error_usage(self.id, self.name, "error", _FALLBACK_ERROR)
 

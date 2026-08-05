@@ -190,6 +190,14 @@ function renderCard(p) {
     return card;
   }
 
+  // stale 也可能带原因（如 Codex 走了本地快照）。数据照常渲染，只是多说一句为什么旧。
+  if (p.status === "stale" && p.error) {
+    const why = document.createElement("div");
+    why.className = "card-error";
+    why.textContent = p.error;
+    card.appendChild(why);
+  }
+
   for (const w of p.windows) {
     card.appendChild(renderWindow(w));
   }
