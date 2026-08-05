@@ -57,7 +57,8 @@ def format_report(
         summary = usage.error if usage.error else "正常"
         lines.append(f"{usage.name:<12}  {mark} {summary}")
         for window in usage.windows:
-            lines.append(f"                · {window.label}: {window.used_pct}%")
+            # 与面板的 fmtPct 对齐：都保留一位小数，别把浮点误差抖给用户
+            lines.append(f"                · {window.label}: {window.used_pct:.1f}%")
 
     lines.append("")
     if pending:

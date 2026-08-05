@@ -67,3 +67,13 @@ def test_report_never_leaks_credentials():
     results = [_usage("kimi", "Kimi", "ok")]
     text, _ = format_report(source, results)
     assert "sk-" not in text
+
+
+def test_percent_is_formatted_like_the_panel():
+    """浮点误差不该泄漏进报告：面板用一位小数，doctor 保持一致。"""
+    source = ConfigSource(path=None, origin="builtin")
+    usage = _usage("kimi", "Kimi", "ok")
+    usage.windows[0].used_pct = 7.000000000000001
+    text, _ = format_report(source, [usage])
+    assert "7.0%" in text
+    assert "7.000000000000001" not in text
