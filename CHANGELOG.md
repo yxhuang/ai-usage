@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version stays below 1.0.0, minor bumps may change behaviour.
 
+## [Unreleased]
+
+### Added
+
+- **`python -m server.doctor`, a one-shot deployment check.** It reports each provider's
+  reachability, where the effective config came from, and — for any provider that fails —
+  what is missing and how to fix it, using the same messages the panel shows. Exit code
+  `0` means nothing is blocking (a `~` degraded state does not count); `1` means at least
+  one `✗` needs attention. `deploy/install.sh` runs it automatically at the end of an
+  install, and a failed diagnosis never fails the install.
+
+### Fixed
+
+- **A Claude HTTP 403 is no longer misreported as an expired login.** 403 means the
+  network layer refused the connection to `api.anthropic.com`, so the card now points at
+  the network and the `providers.claude.proxy` setting instead of telling you to log in
+  again. Only 401 keeps the auth-expired guidance.
+- **The Kimi missing-key hint now distinguishes systemd from a plain shell.** A systemd
+  unit only injects `PATH`, so exports from your shell never reach the service — under
+  systemd the message drops the environment-variable option and points at `api_key` /
+  `api_key_file` in `config.toml` instead of sending you down a path that cannot work.
+
 ## [0.3.0] — 2026-08-02
 
 Two themes. First, the project stops assuming it is running on the author's machine — the

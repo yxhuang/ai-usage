@@ -93,6 +93,21 @@ bash deploy/install.sh
 journalctl --user -u ai-usage -f
 ```
 
+## Diagnosing a deployment
+
+```bash
+uv run python -m server.doctor          # pass --config PATH to check a specific config
+```
+
+One command, three answers: whether each provider can be reached right now, where the
+config in effect came from, and — for whichever provider fails — what exactly is missing
+and how to fix it. The messages come straight from the providers, so what doctor prints
+is the same wording the panel shows. `deploy/install.sh` runs it automatically at the end
+of an install.
+
+Exit code `0` means nothing is blocking; a `~` (degraded but still serving data) does not
+count against it. `1` means at least one `✗` needs attention.
+
 ## Requirements
 
 - **Python 3.11+** and [uv](https://docs.astral.sh/uv/)

@@ -77,6 +77,18 @@ bash deploy/install.sh
 journalctl --user -u ai-usage -f     # 看日志
 ```
 
+## 部署自检
+
+```bash
+uv run python -m server.doctor          # 查指定配置加 --config PATH
+```
+
+一条命令回答三件事：三家现在分别通没通、当前生效的配置来自哪里、没通的那家缺什么
+怎么补。错误文案直接取自各家 provider，和面板里显示的是同一套。`deploy/install.sh`
+装完会自动跑一次。
+
+退出码 `0` 表示没有待办（`~` 降级但有数据可用不算）；`1` 表示有 `✗` 项需要处理。
+
 ## 环境要求
 
 - Python 3.11+ 和 [uv](https://docs.astral.sh/uv/)
