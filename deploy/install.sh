@@ -53,6 +53,10 @@ if systemctl --user is-active --quiet ai-usage.service; then
     echo "✓ 服务已启动：http://127.0.0.1:$PORT"
     echo "  查日志：journalctl --user -u ai-usage -f"
     echo "  停/禁用：systemctl --user disable --now ai-usage.service"
+    echo
+    # 装完立刻告诉用户三家分别通没通。诊断失败不等于安装失败，故 || true：
+    # 没配 key、没配代理属于待办事项，不该让 install.sh 以非零退出。
+    (cd "$PROJECT_DIR" && "$UV_BIN" run --no-sync python -m server.doctor) || true
 else
     echo "✗ 服务启动失败，看日志：journalctl --user -u ai-usage -n 50 --no-pager" >&2
     exit 1
