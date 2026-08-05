@@ -23,6 +23,8 @@
 - **Kimi 缺 key 的提示区分运行环境。** systemd 的 unit 只注入 `PATH`，shell 里 export
   的变量根本到不了服务进程——以 systemd 运行时提示里不再把环境变量列为选项，
   直接指向 `config.toml` 的 `api_key` / `api_key_file`，省得白折腾一轮。
+- **Codex 走兜底快照时会说明原因。** `app-server` 连不上、面板改用本地会话快照时，
+  卡片会直接说明数据为什么是旧的，而不是只显示它有多旧。
 
 ## [0.3.0] — 2026-08-02
 

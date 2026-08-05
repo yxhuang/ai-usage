@@ -29,6 +29,9 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
   unit only injects `PATH`, so exports from your shell never reach the service — under
   systemd the message drops the environment-variable option and points at `api_key` /
   `api_key_file` in `config.toml` instead of sending you down a path that cannot work.
+- **The Codex fallback snapshot now explains itself.** When `app-server` is unreachable
+  and the panel serves the local session snapshot instead, the card says why the data is
+  old rather than only showing how old it is.
 
 ## [0.3.0] — 2026-08-02
 
