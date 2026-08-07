@@ -7,15 +7,16 @@
 ![Local only](https://img.shields.io/badge/network-loopback%20only-brightgreen.svg)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/yxhuang/ai-usage/pulls)
 
-**Three AI subscriptions. One small window. Know before you hit the wall.**
+**Claude, Codex, and Kimi quota in one local panel.**
 
 English | [简体中文](docs/README.zh-CN.md)
 
 **Changelog:** [English](CHANGELOG.md) · [简体中文](docs/CHANGELOG.zh-CN.md)
 
-If you pay for Claude Pro, ChatGPT Plus, and a Kimi plan, your quota lives in three
-places and none of them tell you anything until you're already rate-limited. `ai-usage`
-reads all three and puts them in one always-there panel.
+`ai-usage` reads the subscription quota of all three from credentials already on your
+machine and shows one card per provider: every usage window — 5-hour, weekly, extra
+credits — as a bar, with a tick marking how much of that window has elapsed. It polls in
+the background, binds to loopback only, and never writes to your credentials.
 
 <p align="center">
   <img src="docs/panel-dark.png" width="380"

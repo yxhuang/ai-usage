@@ -6,7 +6,7 @@
 版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。1.0.0 之前，次版本号变动也可能
 改变行为。
 
-## [Unreleased]
+## [0.3.1] — 2026-08-07
 
 ### 新增
 
@@ -25,6 +25,12 @@
   直接指向 `config.toml` 的 `api_key` / `api_key_file`，省得白折腾一轮。
 - **Codex 走兜底快照时会说明原因。** `app-server` 连不上、面板改用本地会话快照时，
   卡片会直接说明数据为什么是旧的，而不是只显示它有多旧。
+
+### 文档
+
+- **README 开头改成直接说明工具做什么。** 原来第一段在铺垫问题，现在直接讲面板本身：
+  一家一张卡片、每个用量窗口一根带节奏刻度的进度条、后台轮询、只绑回环、不写凭证。
+  中英双份同步。
 
 ## [0.3.0] — 2026-08-02
 
@@ -192,6 +198,7 @@
   中间过一层 VBS 以免启动时闪黑框。
 - 68 项离线测试、MIT 许可、CI，以及中英双语 README。
 
+[0.3.1]: https://github.com/yxhuang/ai-usage/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yxhuang/ai-usage/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yxhuang/ai-usage/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yxhuang/ai-usage/releases/tag/v0.1.0

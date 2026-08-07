@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version stays below 1.0.0, minor bumps may change behaviour.
 
-## [Unreleased]
+## [0.3.1] — 2026-08-07
 
 ### Added
 
@@ -32,6 +32,13 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
 - **The Codex fallback snapshot now explains itself.** When `app-server` is unreachable
   and the panel serves the local session snapshot instead, the card says why the data is
   old rather than only showing how old it is.
+
+### Documentation
+
+- **The README opening leads with what the tool does.** The previous intro spent its first
+  paragraph framing the problem; it now describes the panel itself — one card per provider,
+  each usage window as a bar with a pace tick, background polling, loopback only,
+  credentials read but never written. Both languages.
 
 ## [0.3.0] — 2026-08-02
 
@@ -246,6 +253,7 @@ First public release: one panel for Claude, Codex and Kimi subscription quotas.
   launching through a VBS wrapper so no console window flashes.
 - 68 offline tests, MIT licence, CI, and a bilingual README.
 
+[0.3.1]: https://github.com/yxhuang/ai-usage/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yxhuang/ai-usage/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yxhuang/ai-usage/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yxhuang/ai-usage/releases/tag/v0.1.0
