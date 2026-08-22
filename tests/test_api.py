@@ -141,7 +141,21 @@ def test_lifespan_starts_and_stops_cleanly(make_client):
 # ---- 安全：写操作端点的三道校验 ----
 
 
-def test_security_headers_on_every_response(make_client):
+def test_security_headers_default_allows_workbench(make_client):
+    """默认放行本机 workbench 工作台，好让它把面板嵌进主窗口。"""
+    client = make_client(_three_providers())
+    resp = client.get("/api/summary")
+    assert resp.headers["content-security-policy"] == (
+        "frame-ancestors 'self' http://127.0.0.1:8790"
+    )
+    # 白名单非空时必须不下发 XFO：它只有 DENY/SAMEORIGIN，表达不了跨源白名单，
+    # 留着会让老浏览器按 DENY 把 workbench 的 iframe 拦掉。
+    assert "x-frame-options" not in resp.headers
+
+
+def test_security_headers_lock_down_when_allowlist_empty(make_client, monkeypatch):
+    """把白名单置空即回到谁都不许嵌，且 XFO 兜底回来。"""
+    monkeypatch.setenv("AI_USAGE_FRAME_ANCESTORS", "")
     client = make_client(_three_providers())
     resp = client.get("/api/summary")
     assert resp.headers["content-security-policy"] == "frame-ancestors 'none'"

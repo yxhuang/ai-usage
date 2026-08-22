@@ -14,9 +14,19 @@
 另有点击劫持：上面三道都只防「恶意网页自己发请求」。攻击者还可以把本面板套进一个透明
 iframe 诱导你点真开关——那时请求由面板自己发出，三道全部合法通过。所以还要给所有响应
 下发 frame-ancestors，见 SecurityHeadersMiddleware。
+
+frame-ancestors 默认只放行 `'self'` 与本机 workbench 工作台（`127.0.0.1:8790`），
+让它能把本面板嵌进主窗口。放行的是**显式白名单**而不是删掉保护——点击劫持的前提是
+攻击者能在被放行的源上放页面，而这里被放行的只有本机回环的一个固定端口。
+用 `AI_USAGE_FRAME_ANCESTORS` 可覆盖（空格分隔；设为空串即回到谁都不许嵌）。
+
+⚠️ X-Frame-Options 只有 DENY / SAMEORIGIN，**表达不了跨源白名单**。所以一旦白名单
+非空就必须不下发它，否则老浏览器会按 DENY 拦掉——此时点击劫持的兜底只剩 CSP L2。
 """
 
 from __future__ import annotations
+
+import os
 
 from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -25,13 +35,32 @@ REQUESTED_BY = "ai-usage-panel"
 _LOOPBACK = ("127.0.0.1", "localhost", "[::1]")
 
 
+DEFAULT_FRAME_ANCESTORS = ("http://127.0.0.1:8790",)
+
+
+def _frame_ancestors() -> tuple[str, ...]:
+    """允许嵌入本面板的源。返回空元组表示谁都不许嵌。"""
+    raw = os.environ.get("AI_USAGE_FRAME_ANCESTORS")
+    if raw is None:
+        return DEFAULT_FRAME_ANCESTORS
+    return tuple(item for item in raw.split() if item)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         resp = await call_next(request)
+        allowed = _frame_ancestors()
         # 必须是 HTTP 响应头：<meta> 里的 CSP 不支持 frame-ancestors。
-        # X-Frame-Options 是给不支持 CSP L2 的老浏览器兜底。
-        resp.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
-        resp.headers["X-Frame-Options"] = "DENY"
+        if allowed:
+            resp.headers["Content-Security-Policy"] = "frame-ancestors 'self' " + " ".join(allowed)
+            # X-Frame-Options 表达不了跨源白名单，留着只会让老浏览器按 DENY 拦掉。
+            # 正常情况下只有本中间件会设它；这里防的是上游中间件也设了的情形。
+            if "x-frame-options" in resp.headers:
+                del resp.headers["X-Frame-Options"]
+        else:
+            resp.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+            # 给不支持 CSP L2 的老浏览器兜底。
+            resp.headers["X-Frame-Options"] = "DENY"
         return resp
 
 
