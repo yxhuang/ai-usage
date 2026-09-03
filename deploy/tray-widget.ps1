@@ -28,6 +28,15 @@
     托盘没反应，这期间补点的击键同样作废——否则它们会在面板打开的瞬间集中送达，把刚开好的
     窗口又关回去。判据见 Test-AcceptClick，改它之前先跑 tests/tray-click-filter.ps1。
 
+    显隐的依据是「用户眼里看不看得见」，不是「系统认为窗口存不存在」：窗口被别的窗口
+    完全盖住时（IsWindowVisible 照样是 True），点击算「显示」、不算「隐藏」——否则点
+    一下只是把一个本来就看不见的面板「藏」得更深，要按第二下才出来。这条判据在
+    Get-ClickAction / Test-PanelOnTop，改它们之前同样先跑 tests/tray-click-filter.ps1。
+    把被压住的面板抬出来靠「先收再放」（SW_HIDE 再 SW_SHOW），不用 TOPMOST 抬升——
+    那是别的进程的窗口，能不能抬动没把握，而「收再放」正是点第二下时实际走的路径。
+    另外显示器拔掉或换分辨率后面板可能整个落在屏幕外，靠 Test-PanelOnScreen 发现、
+    在 Show-Panel 里拉回角落。
+
     ⚠️ 改完这个文件要重新部署才生效：install-widget.ps1 是把脚本**复制**到
     %LOCALAPPDATA%\ai-usage\，托盘跑的是那份副本，改仓库不会自动同步。重跑一次
     install-widget.ps1 即可（它会覆盖副本，快捷方式和图标都不用重设）。
@@ -105,6 +114,12 @@ public static class W32 {
     public static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    // 「用户看不看得见面板」得看它被谁盖住：取样点上最顶层的窗口不是自己，就是被挡了
+    [DllImport("user32.dll")]
+    public static extern IntPtr WindowFromPoint(POINT p);
+    // WindowFromPoint 可能返回控件子窗口，GetAncestor(GA_ROOT) 才能归到顶层窗口跟面板比
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
     [DllImport("user32.dll")]
     public static extern bool SetProcessDPIAware();
     // 当前正在处理的这条消息是「什么时候投递的」，跟 Environment.TickCount 同基准。
@@ -116,6 +131,8 @@ public static class W32 {
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT { public int X, Y; }
 
     // 自己枚举顶层窗口按标题认人。别用 Process.MainWindowHandle：一个 chrome 进程可能
     // 挂着好几个窗口，.NET 只报「枚举到的第一个」，Z 序一变报的就换人；而且窗口一旦
@@ -158,6 +175,7 @@ $SWP_NOSIZE       = 0x0001
 $SWP_NOZORDER     = 0x0004
 $SWP_NOACTIVATE   = 0x0010
 $SWP_FRAMECHANGED = 0x0020
+$GA_ROOT          = 2
 
 $Url = "http://localhost:$Port"
 # 独立 profile：跟桌面快捷方式那份分开，两种开法可以并存互不干扰。
@@ -304,8 +322,23 @@ function Show-Panel {
     # 显出来的仍是缩在屏幕角落那个小条——点多少次都一样，实测过。
     if ([W32]::IsIconic($script:Hwnd)) {
         [void][W32]::ShowWindow($script:Hwnd, $SW_RESTORE)
+    } elseif ((Test-PanelVisible) -and (-not (Test-PanelOnTop))) {
+        # 窗口开着、只是整个压在别人底下：SW_SHOW 对已显示的窗口是空操作，SetForegroundWindow
+        # 又常被前台锁拦下，所以要「先收再放」——SW_SHOW 作用在刚被 SW_HIDE 的窗口上会顺带
+        # 激活并抬到最上面。用户此刻本来就看不见它，这一收一放没有可见闪烁。这条路径正是
+        # 「点第二下才出来」时实际走的那条，已在真机验证有效，不依赖任何前台权限。
+        [void][W32]::ShowWindow($script:Hwnd, $SW_HIDE)
+        [void][W32]::ShowWindow($script:Hwnd, $SW_SHOW)
     } else {
         [void][W32]::ShowWindow($script:Hwnd, $SW_SHOW)
+    }
+    # 显示器拔掉或换分辨率后，面板可能整个落在所有屏幕之外——还活着、系统也认为可见，
+    # 但谁也看不见。这是唯一能把跑出屏幕的面板拉回来的自动路径，所以只在「跟所有屏幕
+    # 都没有交集」这种铁证下才动用户的窗口位置，不能放宽条件。
+    # Corner='None' 时 Set-Corner 直接什么都不做，救援必须换个具体角落。
+    if (-not (Test-PanelOnScreen)) {
+        $rescue = if ($Corner -eq 'None') { 'TopRight' } else { $Corner }
+        Set-Corner $script:Hwnd $rescue
     }
     [void][W32]::SetForegroundWindow($script:Hwnd)
     $script:LastActionEndTick = [Environment]::TickCount
@@ -316,8 +349,72 @@ function Hide-Panel {
     $script:LastActionEndTick = [Environment]::TickCount
 }
 
+# 点一下托盘到底该显示还是该隐藏，判据就这一条。
+#
+# 关键：「系统认为窗口可见」（IsWindowVisible=True、没最小化）不等于「用户看得见」——
+# 面板可能只是 Z 序压在别的窗口（比如编辑器）底下，被完全遮挡，用户眼里它根本不在。
+# 这时如果按系统状态判成「显示着」而走了隐藏，用户点一下毫无变化、点第二下才出来。
+# 所以除了 alive / visible / iconic，还要多看一个 onTop（此刻是不是真的露在最上面）：
+# 四条全满足才算「显示着」→ 点一下该隐藏；其余一切情况都当「看不见」→ 点一下该显示。
+#
+# 函数体故意只用四个参数、不碰 $script: 变量也不调 [W32]::——
+# tests/tray-click-filter.ps1 会把它整段抠出来单独跑真值表。
+function Get-ClickAction([bool]$alive, [bool]$visible, [bool]$iconic, [bool]$onTop) {
+    if ($alive -and $visible -and (-not $iconic) -and $onTop) { return 'Hide' }
+    return 'Show'
+}
+
+# 面板此刻在用户眼里是不是真的露在最上面。问法：在面板的可见区域里取样，看取样点上
+# 最顶层的窗口是不是面板自己；有一个点被别的窗口占了，说明那里被挡。
+# 之所以沿对角线取 3 个点而不是只看中心一点：鼠标指针、别家的小浮层这类局部遮挡
+# 可能恰好盖住中心，单点采样会把「只是被鼠标压着」误判成「整个被挡住」。
+# 已知限制：如果有一个**常驻置顶**的窗口恰好盖住全部三个采样点，判据会一直认为面板
+# 被挡、点击永远走显示而不隐藏；这种情况下面板确实也显示不出来（它不是置顶窗口），
+# 旧判据同样看不见，属于已知限制，不在这层解决。
+function Test-PanelOnTop {
+    # 窗口已收进托盘或已最小化，就谈不上「露在最上面」，也省得对隐藏窗口做无谓的采样
+    if (-not (Test-PanelVisible)) { return $false }
+    $rect = New-Object W32+RECT
+    # 拿不到矩形就没有证据，退回旧行为（当成露在外面），别把人挡在门外
+    if (-not [W32]::GetWindowRect($script:Hwnd, [ref]$rect)) { return $true }
+    $w = $rect.Right - $rect.Left
+    $h = $rect.Bottom - $rect.Top
+    foreach ($f in @(0.25, 0.5, 0.75)) {
+        $pt = New-Object W32+POINT
+        $pt.X = $rect.Left + [int]($w * $f)
+        $pt.Y = $rect.Top + [int]($h * $f)
+        $top = [W32]::GetAncestor([W32]::WindowFromPoint($pt), $GA_ROOT)
+        if ($top -eq $script:Hwnd) { return $true }
+    }
+    return $false
+}
+
+# 面板矩形跟任何一块屏幕还有没有交集。显示器拔掉或换了分辨率之后，之前记住的
+# 位置可能整个落到屏幕外——窗口还活着、系统也认为它可见，但谁也看不见它，
+# 而且采样点全在屏外，onTop 会恒为假，左键就此失灵。
+function Test-PanelOnScreen {
+    # 没窗口谈不上跑出屏幕，返回真以免触发救援
+    if (-not (Test-PanelAlive)) { return $true }
+    $rect = New-Object W32+RECT
+    # 拿不到矩形就没有证据，别乱动用户的窗口
+    if (-not [W32]::GetWindowRect($script:Hwnd, [ref]$rect)) { return $true }
+    foreach ($s in [System.Windows.Forms.Screen]::AllScreens) {
+        $b = $s.Bounds
+        $iw = [Math]::Min($rect.Right, $b.Right) - [Math]::Max($rect.Left, $b.Left)
+        $ih = [Math]::Min($rect.Bottom, $b.Bottom) - [Math]::Max($rect.Top, $b.Top)
+        if ($iw -gt 0 -and $ih -gt 0) { return $true }
+    }
+    return $false
+}
+
+# 先从系统问齐四个事实，显隐决定交给 Get-ClickAction——它只看「用户眼里看不看得见」，
+# 不再拿「系统认为窗口存在」当「用户看得见」（那正是点一下没反应、要按两下的根因）。
 function Switch-Panel {
-    if (Test-PanelVisible) { Hide-Panel } else { Show-Panel }
+    $alive = Test-PanelAlive
+    $visible = $alive -and [W32]::IsWindowVisible($script:Hwnd)
+    $iconic = $alive -and [W32]::IsIconic($script:Hwnd)
+    $onTop = Test-PanelOnTop
+    if ((Get-ClickAction $alive $visible $iconic $onTop) -eq 'Hide') { Hide-Panel } else { Show-Panel }
 }
 
 # 记住窗口当前的位置和大小，供关掉后重开时还原——否则每次重开都跳回默认角落。
