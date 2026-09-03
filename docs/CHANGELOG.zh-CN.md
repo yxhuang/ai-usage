@@ -6,6 +6,47 @@
 版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。1.0.0 之前，次版本号变动也可能
 改变行为。
 
+## [Unreleased]
+
+### 修复
+
+- **单击托盘图标现在能正常切换面板显隐了。** 之前要点两下：显隐判据问的是
+  「系统认为这个窗口还在不在」（`IsWindowVisible` 再加一道 `IsIconic` 判断），
+  而一个窗口完全可以在 Windows 眼里「可见」、同时整个压在编辑器底下。于是第一下
+  点击把一个本来就看不见的面板「隐藏」了，第二下才真的显示出来。现在判据改成问
+  「你现在看不看得见它」：新函数 `Test-PanelOnTop` 沿面板对角线取三个点，用
+  `WindowFromPoint` + `GetAncestor(GA_ROOT)` 看那些点上最顶层的窗口是不是面板自己；
+  三个点全都不是，这次点击就算「显示」。把被压住的面板抬出来用的是「先收再放」
+  （`SW_HIDE` 紧接 `SW_SHOW`）：对一个已经显示的窗口 `SW_SHOW` 是空操作，而
+  `SetForegroundWindow` 通常会被拒绝——点托盘的那次输入算在任务栏头上，
+  不算在本进程头上。这条路径正是过去「点第二下就出来了」实际走的那条。
+  已知限制：如果有一个常驻置顶的窗口恰好盖住全部三个采样点，
+  判据会一直认为面板被遮挡——不过这种情况下面板本来也显示不出来，
+  因为它自己不是置顶窗口。
+- **面板落到屏幕之外不再让左键彻底失灵。** 显示器拔掉或换分辨率后，
+  面板可能整个落到所有屏幕之外。那时三个采样点全在屏外，判据会永远认为「看不见」，
+  而显示动作又不移动窗口，于是左键既显示不出来也隐藏不掉。现在
+  `Test-PanelOnScreen` 会发现这种情况，由 `Show-Panel` 把面板拉回角落。
+- **点击判据抽成了纯函数，并用真值表覆盖。** 判据提取为 `Get-ClickAction`；
+  `tests/tray-click-filter.ps1` 穷举其输入的全部 16 种布尔组合，
+  另外单独钉死了这次故障的回归用例。
+- **改完要重跑安装脚本才会生效。** 托盘跑的是 `%LOCALAPPDATA%` 下的副本，
+  修复后要重跑一次 `deploy/install-widget.ps1`。
+
+### 安全
+
+- **`frame-ancestors` 从 `'none'` 改成显式白名单。** 之前所有响应下发的是
+  `Content-Security-Policy: frame-ancestors 'none'` 加 `X-Frame-Options: DENY`，
+  谁都不许把面板嵌进 iframe。现在默认放行 `'self'` 和本机工作台
+  `http://127.0.0.1:8790`，好让 workbench 把这个面板嵌进主窗口。要强调的是，
+  这是**放行一个白名单、不是删掉防护**：点击劫持的前提是攻击者能在被放行的源上
+  放页面，而这里放行的只有本机回环上的一个固定端口。可以用环境变量
+  `AI_USAGE_FRAME_ANCESTORS` 覆盖（空格分隔多个源；设成空串就回到「谁都不许嵌」）。
+- **白名单非空时不再下发 `X-Frame-Options`，这是有意的取舍。**
+  `X-Frame-Options` 只有 `DENY` 和 `SAMEORIGIN` 两种取值，表达不了跨源白名单，
+  继续下发只会让老浏览器按 `DENY` 一律拦掉。代价要说清楚：白名单非空时，
+  点击劫持的兜底只剩 CSP Level 2。白名单为空时行为跟以前完全一样。
+
 ## [0.3.1] — 2026-08-07
 
 ### 新增
@@ -198,6 +239,7 @@
   中间过一层 VBS 以免启动时闪黑框。
 - 68 项离线测试、MIT 许可、CI，以及中英双语 README。
 
+[Unreleased]: https://github.com/yxhuang/ai-usage/compare/v0.3.1...HEAD
 [0.3.1]: https://github.com/yxhuang/ai-usage/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yxhuang/ai-usage/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yxhuang/ai-usage/compare/v0.1.0...v0.2.0

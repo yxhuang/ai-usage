@@ -8,6 +8,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version stays below 1.0.0, minor bumps may change behaviour.
 
+## [Unreleased]
+
+### Fixed
+
+- **A single click on the tray icon now toggles the panel.** It used to take two: the
+  show/hide decision asked "does Windows think this window still exists"
+  (`IsWindowVisible`, plus an `IsIconic` check), and a window can be perfectly
+  "visible" to Windows while sitting entirely underneath the editor. The first click
+  therefore "hid" a panel you already couldn't see, and only the second one actually
+  showed it. The criterion now asks "can you actually see it": a new
+  `Test-PanelOnTop` samples three points along the panel's diagonal and uses
+  `WindowFromPoint` + `GetAncestor(GA_ROOT)` to check whether the topmost window at
+  each point is the panel itself; if all three belong to something else, the click is
+  treated as "show". Raising a buried panel is done by hide-then-show (`SW_HIDE`
+  immediately followed by `SW_SHOW`): `SW_SHOW` alone is a no-op on a window that is
+  already shown, and `SetForegroundWindow` is usually refused because the tray click
+  counts as input to the taskbar, not to this process. This is exactly the path the
+  old "it appears on the second click" behaviour was really taking. Known limitation:
+  if an always-on-top window happens to cover all three sample points, the criterion
+  keeps reporting the panel as covered — though the panel could not be shown there
+  anyway, since it is not topmost itself.
+- **A panel stranded off-screen no longer kills left click entirely.** After a
+  monitor is unplugged or the resolution changes, the panel can end up entirely
+  outside every screen. All three sample points are then off-screen, so the criterion
+  would forever answer "not visible", while the show action does not move the
+  window — left click could neither show nor hide it. `Test-PanelOnScreen` now
+  detects this situation and `Show-Panel` pulls the panel back into a corner.
+- **The click decision is now a pure function, covered by a truth table.** The
+  criterion was extracted into `Get-ClickAction`; `tests/tray-click-filter.ps1`
+  exhaustively covers all 16 boolean combinations of its inputs, plus a dedicated
+  regression case pinning down this exact bug.
+- **Re-run the installer for this to take effect.** The tray runs the copy under
+  `%LOCALAPPDATA%`, so the fix only reaches the running widget after
+  `deploy/install-widget.ps1` is run again.
+
+### Security
+
+- **`frame-ancestors` is now an explicit allowlist instead of `'none'`.** Every
+  response used to carry `Content-Security-Policy: frame-ancestors 'none'` plus
+  `X-Frame-Options: DENY`, forbidding anyone from framing the panel. The default is
+  now `'self'` plus the local workbench at `http://127.0.0.1:8790`, so the workbench
+  can embed the panel in its main window. To be clear, this opens an explicit allowlist
+  rather than removing the protection: clickjacking requires the attacker to place a
+  page on an allowed origin, and what is allowed here is only a fixed port on the
+  loopback interface. The `AI_USAGE_FRAME_ANCESTORS` environment variable overrides
+  the list (space-separated origins; set it to an empty string to go back to allowing
+  no one).
+- **With a non-empty allowlist, `X-Frame-Options` is no longer sent — deliberately.**
+  `X-Frame-Options` only has `DENY` and `SAMEORIGIN`; it cannot express a
+  cross-origin allowlist, so sending it alongside one would make older browsers block
+  everything as if it were `DENY`. The trade-off worth stating: with a non-empty
+  allowlist, the only clickjacking fallback left is CSP Level 2. With an empty
+  allowlist the behaviour is exactly the same as before.
+
 ## [0.3.1] — 2026-08-07
 
 ### Added
@@ -253,6 +307,7 @@ First public release: one panel for Claude, Codex and Kimi subscription quotas.
   launching through a VBS wrapper so no console window flashes.
 - 68 offline tests, MIT licence, CI, and a bilingual README.
 
+[Unreleased]: https://github.com/yxhuang/ai-usage/compare/v0.3.1...HEAD
 [0.3.1]: https://github.com/yxhuang/ai-usage/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yxhuang/ai-usage/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yxhuang/ai-usage/compare/v0.1.0...v0.2.0
