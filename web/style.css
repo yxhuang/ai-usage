@@ -4,23 +4,31 @@
  * 取向：颜色只用来表达"状态"，从不用来装饰；克制留给节奏刻度这一个记忆点。
  */
 
+/* 深浅色：每个令牌写成 light-dark(浅色, 深色)，由 color-scheme 决定取哪一个。
+   默认跟随系统；设置里选了浅色/深色时，app.js 给 <html> 加 data-theme 强制一种。
+   这样深色令牌只写一份，不用在 @media 和 [data-theme] 里各抄一遍。 */
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
 :root {
-  /* 浅色（默认） */
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --line: #e4e6ec;
-  --track: #eceef3;
-  --ink: #1b1d23;
-  --ink-muted: #6c7280;
-  --ink-faint: #9ba1ad;
-  --fill: #5b6ee8;       /* 正常档兜底：冷静的靛蓝（各家用下面的品牌色覆写） */
-  --fill-warn: #c98229;  /* ≥70% */
-  --fill-danger: #cf4d63;/* ≥90% */
-  --pace: #0e1015;                          /* 刻度的芯，比正文再深一点 */
-  --pace-rim: rgba(255, 255, 255, 0.95);    /* 贴身描边：压在品牌色填充上也不糊 */
-  --pace-halo: rgba(14, 16, 21, 0.42);      /* 内层光晕（浅色下是投影，不是发光） */
-  --pace-halo-soft: rgba(14, 16, 21, 0.20); /* 外层光晕，散得更开 */
-  --focus: #5b6ee8;
+  --bg: light-dark(#f6f7f9, #131519);
+  --surface: light-dark(#ffffff, #1a1d23);
+  --line: light-dark(#e4e6ec, #272b33);
+  --track: light-dark(#eceef3, #23262d);
+  --ink: light-dark(#1b1d23, #e7e9ee);
+  --ink-muted: light-dark(#6c7280, #969cab);
+  --ink-faint: light-dark(#9ba1ad, #6d7484);
+  --fill: light-dark(#5b6ee8, #8b96f2);       /* 正常档兜底：冷静的靛蓝（各家用下面的品牌色覆写） */
+  --fill-warn: light-dark(#c98229, #dda44f);  /* ≥70% */
+  --fill-danger: light-dark(#cf4d63, #e6788c);/* ≥90% */
+  /* 刻度：浅色下芯比正文再深一点、光晕是投影；深色下才是真发光——芯拉到纯白，光晕带一丝冷调。
+     深色描边刻意压到很淡：芯与背景本就极限对比，描边太重会卡在芯和光晕中间把辉光掐断。 */
+  --pace: light-dark(#0e1015, #ffffff);
+  --pace-rim: light-dark(rgba(255, 255, 255, 0.95), rgba(10, 12, 16, 0.45));
+  --pace-halo: light-dark(rgba(14, 16, 21, 0.42), rgba(216, 231, 255, 0.62));
+  --pace-halo-soft: light-dark(rgba(14, 16, 21, 0.20), rgba(148, 190, 255, 0.34));
+  --focus: light-dark(#5b6ee8, #8b96f2);
 
   --radius: 10px;
   --row-gap: 11px;
@@ -30,36 +38,9 @@
    因为那两档是状态信号，不该被品牌色盖掉。
    三家的色相刻意拉开（珊瑚 ~15° / 青绿 ~165° / 蓝 ~215°），窄窗里也一眼可分。
    Codex 用的是 OpenAI 的青绿而非其现行纯黑品牌色——黑色当填充会跟节奏刻度撞车。 */
-.card[data-provider="claude"] { --fill: #d97757; } /* Anthropic 珊瑚橙 */
-.card[data-provider="codex"]  { --fill: #10a37f; } /* OpenAI 青绿 */
-.card[data-provider="kimi"]   { --fill: #1a73e8; } /* Kimi 蓝 */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131519;
-    --surface: #1a1d23;
-    --line: #272b33;
-    --track: #23262d;
-    --ink: #e7e9ee;
-    --ink-muted: #969cab;
-    --ink-faint: #6d7484;
-    --fill: #8b96f2;
-    --fill-warn: #dda44f;
-    --fill-danger: #e6788c;
-    /* 深色下才是真发光：芯拉到纯白，光晕带一丝冷调，像自己在亮。
-       描边刻意压到很淡——深色下芯与背景本就极限对比，描边太重反而会卡在
-       芯和光晕中间把辉光掐断，只需留一点点压住品牌色填充即可。 */
-    --pace: #ffffff;
-    --pace-rim: rgba(10, 12, 16, 0.45);
-    --pace-halo: rgba(216, 231, 255, 0.62);
-    --pace-halo-soft: rgba(148, 190, 255, 0.34);
-    --focus: #8b96f2;
-  }
-
-  .card[data-provider="claude"] { --fill: #e08b6f; }
-  .card[data-provider="codex"]  { --fill: #2bc49c; }
-  .card[data-provider="kimi"]   { --fill: #5aa9ff; }
-}
+.card[data-provider="claude"] { --fill: light-dark(#d97757, #e08b6f); } /* Anthropic 珊瑚橙 */
+.card[data-provider="codex"]  { --fill: light-dark(#10a37f, #2bc49c); } /* OpenAI 青绿 */
+.card[data-provider="kimi"]   { --fill: light-dark(#1a73e8, #5aa9ff); } /* Kimi 蓝 */
 
 body {
   margin: 0;
@@ -330,8 +311,10 @@ main {
   outline-offset: 1px;
 }
 
-/* 设置视图：与卡片互斥显示，所以永远在可视区顶部，不会被卡片挤出去。 */
+/* 设置视图：插在顶栏正下方、卡片之上，展开时不用往下翻；卡片照常显示，切配色能直接看到效果。
+   注意 main 是 display:flex，[hidden] 对它无效——曾经想靠 hidden 让两者互斥，从没生效过。 */
 .settings {
+  margin-bottom: 9px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -373,6 +356,44 @@ main {
   line-height: 1.45;
 }
 
+.setting-row + .setting-row,
+.setting-note + .setting-row { margin-top: 12px; }
+
+/* 配色三选一：并排按钮，选中的那个实底 */
+.segmented {
+  margin-left: auto;
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  flex: none;
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: none;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.segmented button + button { border-left: 1px solid var(--line); }
+.segmented button:hover { color: var(--ink); }
+.segmented button[aria-pressed="true"] { color: var(--surface); background: var(--ink); }
+
 .setting-note.warn {
   color: var(--fill-warn);
+}
+
+/* 触屏（手机经 workbench 反向代理打开）：点按目标至少 44px。
+   资源与接口都用相对路径，面板挂在 /pages/ai-usage/ 这样的子路径下也能用。 */
+@media (pointer: coarse) {
+  #refresh-btn { min-height: 44px; padding: 0 16px; }
+  .gear { width: 44px; height: 44px; }
+  .setting-row { min-height: 44px; }
+  .setting-row input[type="checkbox"] { width: 22px; height: 22px; }
+  .segmented button { min-height: 40px; padding: 0 14px; }
+  .setting-note { margin-left: 30px; }
 }

@@ -9,6 +9,27 @@
  * 它把一个静态的量表变成了可以据此决策的东西——这正是这个小窗存在的意义。
  */
 
+/* ---- 配色：跟随系统 / 浅色 / 深色 ----
+ * 存在本页源的 localStorage 里：直开 8788、嵌进 workbench（经它的反向代理，源是工作台的）
+ * 各记各的，互不影响，也独立于 workbench 自己的主题。最先执行，免得先闪一下另一种配色。 */
+const THEME_KEY = "ai-usage-theme";
+
+function readTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return t === "light" || t === "dark" ? t : "auto";
+  } catch (e) {
+    return "auto"; // 存储被禁用（隐私模式等）就跟随系统
+  }
+}
+
+function applyTheme(theme) {
+  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;
+}
+
+applyTheme(readTheme());
+
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const MINUTE = 60000;
 
@@ -274,7 +295,7 @@ async function load(url, options, failMsg) {
   }
 }
 
-const loadSummary = () => load("/api/summary", undefined, "获取数据失败，下面是上一次的结果");
+const loadSummary = () => load("api/summary", undefined, "获取数据失败，下面是上一次的结果");
 
 /* 会改状态的请求都要带这个头。服务端拿它当主防线：跨域请求带非 safelisted 自定义头
  * 必然触发预检，而服务端不返回任何 CORS 头，预检必失败——恶意网页发不出这种请求。 */
@@ -284,7 +305,7 @@ async function refreshAll() {
   const btn = document.getElementById("refresh-btn");
   btn.disabled = true;
   try {
-    await load("/api/refresh?provider=all",
+    await load("api/refresh?provider=all",
       { method: "POST", headers: MUTATE_HEADERS },
       "刷新失败，下面是上一次的结果");
   } finally {
@@ -296,27 +317,24 @@ async function refreshAll() {
 
 function renderHook(s) {
   document.getElementById("hook-switch").checked = s.enabled;
+  // 正常状态不加说明小字，只在开关不起作用时出警告
+  hookWarn(s.hook_installed ? "" : "未检测到编辑器钩子，开关暂时不起作用。装法见 README。");
+}
+
+function hookWarn(text) {
   const note = document.getElementById("hook-note");
-  if (!s.hook_installed) {
-    note.textContent = "未检测到编辑器钩子，开关暂时不起作用。装法见 README。";
-    note.className = "setting-note warn";
-  } else {
-    note.textContent = s.enabled
-      ? "打开 VSCode 时自动开出面板。"
-      : "已关闭，打开 VSCode 不会自动开面板。";
-    note.className = "setting-note";
-  }
+  note.textContent = text;
+  note.className = "setting-note warn";
+  note.hidden = !text;
 }
 
 async function loadHook() {
   try {
-    const resp = await fetch("/api/vscode-hook");
+    const resp = await fetch("api/vscode-hook");
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     renderHook(await resp.json());
   } catch (e) {
-    const note = document.getElementById("hook-note");
-    note.textContent = "读不到开关状态。";
-    note.className = "setting-note warn";
+    hookWarn("读不到开关状态。");
   }
 }
 
@@ -324,7 +342,7 @@ async function setHook(enabled) {
   const box = document.getElementById("hook-switch");
   box.disabled = true;
   try {
-    const resp = await fetch("/api/vscode-hook", {
+    const resp = await fetch("api/vscode-hook", {
       method: "PUT",
       headers: { ...MUTATE_HEADERS, "Content-Type": "application/json" },
       body: JSON.stringify({ enabled }),
@@ -333,9 +351,7 @@ async function setHook(enabled) {
     renderHook(await resp.json());
   } catch (e) {
     box.checked = !enabled; // 没改成就退回原状，别让界面撒谎
-    const note = document.getElementById("hook-note");
-    note.textContent = "改不动这个开关，看看 daemon 日志。";
-    note.className = "setting-note warn";
+    hookWarn("改不动这个开关，看看 daemon 日志。");
   } finally {
     box.disabled = false;
   }
@@ -405,10 +421,31 @@ function buildSettingsUI() {
 
     const note = document.createElement("p");
     note.id = "hook-note";
-    note.className = "setting-note";
+    note.className = "setting-note warn";
+    note.hidden = true;
 
-    panel.append(row, note);
-    cards.after(panel);
+    // 三个并排按钮而不是下拉框：一点就切，手机上也不用再弹一层菜单
+    const themeRow = document.createElement("div");
+    themeRow.className = "setting-row";
+    const themeLabel = document.createElement("span");
+    themeLabel.className = "setting-label";
+    themeLabel.textContent = "配色";
+    const group = document.createElement("div");
+    group.id = "theme-group";
+    group.className = "segmented";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "配色");
+    for (const [value, text] of [["auto", "跟随系统"], ["light", "浅色"], ["dark", "深色"]]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.theme = value;
+      b.textContent = text;
+      group.append(b);
+    }
+    themeRow.append(themeLabel, group);
+
+    panel.append(row, note, themeRow);
+    header.after(panel); // 紧贴顶栏（齿轮、刷新那一栏）下方展开
   }
   return { btn, panel, cards };
 }
@@ -416,15 +453,15 @@ function buildSettingsUI() {
 function wireSettings() {
   const built = buildSettingsUI();
   if (!built) return;
-  const { btn, panel, cards } = built;
+  const { btn, panel } = built;
   const box = document.getElementById("hook-switch");
   const note = document.getElementById("hook-note");
-  if (!box || !note) return;
+  const group = document.getElementById("theme-group");
+  if (!box || !note || !group) return;
 
   btn.addEventListener("click", () => {
     const open = panel.hidden;
     panel.hidden = !open;
-    cards.hidden = open; // 互斥：设置开着就不显示卡片
     btn.setAttribute("aria-expanded", String(open));
     btn.classList.toggle("active", open);
     if (open) loadHook();
@@ -432,6 +469,26 @@ function wireSettings() {
   });
 
   box.addEventListener("change", (e) => setHook(e.currentTarget.checked));
+
+  const markTheme = (theme) => {
+    for (const b of group.querySelectorAll("button")) {
+      b.setAttribute("aria-pressed", String(b.dataset.theme === theme));
+    }
+  };
+  markTheme(readTheme());
+  group.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const theme = b.dataset.theme;
+    applyTheme(theme);
+    markTheme(theme);
+    try {
+      if (theme === "auto") localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, theme);
+    } catch (err) {
+      // 存不下就只对本次打开生效
+    }
+  });
 }
 
 wireSettings();
