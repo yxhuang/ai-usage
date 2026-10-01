@@ -74,8 +74,8 @@
 param(
     [int]$Port = 8788,
     [string]$Title = "AI 用量面板",
-    [int]$Width = 370,
-    [int]$Height = 640,
+    [int]$Width = 315,
+    [int]$Height = 655,
     [ValidateSet('TopRight', 'BottomRight', 'TopLeft', 'BottomLeft', 'None')]
     [string]$Corner = 'TopRight',
     [int]$Margin = 12,

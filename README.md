@@ -142,7 +142,7 @@ A browser window in `--app` mode already looks close to a native widget — no a
 no tabs. Two ways to run it on Windows, both documented in
 [deploy/windows-shortcut.md](deploy/windows-shortcut.md):
 
-**1. Just a shortcut.** One `chrome.exe --app=http://localhost:8788 --window-size=370,640`
+**1. Just a shortcut.** One `chrome.exe --app=http://localhost:8788 --window-size=315,655`
 and you have a clean little window.
 
 **2. Live in the system tray** — [`deploy/tray-widget.ps1`](deploy/tray-widget.ps1).

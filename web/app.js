@@ -28,7 +28,24 @@ function applyTheme(theme) {
   else delete document.documentElement.dataset.theme;
 }
 
-applyTheme(readTheme());
+/* 嵌在 workbench 侧栏里（经它的同源反向代理）时，配色直接跟工作台走：
+ * 镜像父页 <html data-theme>，父页切换时同步；本页自己的配色设置在嵌入时隐藏。
+ * 跨源嵌入或直开 8788 时取不到父页，照旧用自己的设置。 */
+const hostRoot = (() => {
+  try {
+    return window.parent !== window ? window.parent.document.documentElement : null;
+  } catch (e) {
+    return null;
+  }
+})();
+
+if (hostRoot) {
+  const follow = () => applyTheme(hostRoot.dataset.theme);
+  follow();
+  new MutationObserver(follow).observe(hostRoot, { attributes: true, attributeFilter: ["data-theme"] });
+} else {
+  applyTheme(readTheme());
+}
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const MINUTE = 60000;
@@ -159,13 +176,6 @@ function renderWindow(w) {
     const foot = document.createElement("div");
     foot.className = "window-reset";
     foot.textContent = parts.join(" · ");
-    // 只在明显偏快时才点破，避免每行都挂个提示
-    if (pace !== null && used - pace > 5 && used >= 25) {
-      const ahead = document.createElement("span");
-      ahead.className = "ahead";
-      ahead.textContent = " · 快于节奏";
-      foot.appendChild(ahead);
-    }
     row.appendChild(foot);
   }
   return row;
@@ -444,6 +454,7 @@ function buildSettingsUI() {
     }
     themeRow.append(themeLabel, group);
 
+    if (hostRoot) themeRow.style.display = "none"; // .setting-row 是 flex，[hidden] 压不住；嵌入时配色跟工作台，自己的设置不生效就别摆出来
     panel.append(row, note, themeRow);
     header.after(panel); // 紧贴顶栏（齿轮、刷新那一栏）下方展开
   }

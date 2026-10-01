@@ -119,7 +119,7 @@ uv run python -m server.doctor          # 查指定配置加 --config PATH
 开窗口最省事的办法是用浏览器的 app 模式，没有地址栏也没有标签栏，看着接近原生挂件：
 
 ```
-chrome --app=http://localhost:8788 --window-size=370,640
+chrome --app=http://localhost:8788 --window-size=315,655
 ```
 
 把这条做成快捷方式就能双击打开。Windows 建 `.lnk`，macOS 用 Automator 应用或 `.command`

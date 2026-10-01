@@ -6,19 +6,22 @@
 
 /* 深浅色：每个令牌写成 light-dark(浅色, 深色)，由 color-scheme 决定取哪一个。
    默认跟随系统；设置里选了浅色/深色时，app.js 给 <html> 加 data-theme 强制一种。
-   这样深色令牌只写一份，不用在 @media 和 [data-theme] 里各抄一遍。 */
+   这样深色令牌只写一份，不用在 @media 和 [data-theme] 里各抄一遍。
+   深浅两套底色/文字/线都与 workbench(8790) 的暖色令牌统一（2026-10-01 用户定）：
+   浅 bg #F0EEE6(=wb 侧栏) surface #FFFFFF line #E3E0D6 track #E7E5DB ink #1F1E1D/#5C5A54/#69665E focus #276C8D；
+   深 bg #1F1E1D surface #262624 line #3A3936 ink #F2F0EA/#A8A59D/#908D85 focus #4FA8D0；品牌填充与刻度不变。 */
 :root { color-scheme: light dark; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 
 :root {
-  --bg: light-dark(#f6f7f9, #131519);
-  --surface: light-dark(#ffffff, #1a1d23);
-  --line: light-dark(#e4e6ec, #272b33);
-  --track: light-dark(#eceef3, #23262d);
-  --ink: light-dark(#1b1d23, #e7e9ee);
-  --ink-muted: light-dark(#6c7280, #969cab);
-  --ink-faint: light-dark(#9ba1ad, #6d7484);
+  --bg: light-dark(#F0EEE6, #1F1E1D);
+  --surface: light-dark(#FFFFFF, #262624);
+  --line: light-dark(#E3E0D6, #3A3936);
+  --track: light-dark(#E7E5DB, #33322F);
+  --ink: light-dark(#1F1E1D, #F2F0EA);
+  --ink-muted: light-dark(#5C5A54, #A8A59D);
+  --ink-faint: light-dark(#69665E, #908D85);
   --fill: light-dark(#5b6ee8, #8b96f2);       /* 正常档兜底：冷静的靛蓝（各家用下面的品牌色覆写） */
   --fill-warn: light-dark(#c98229, #dda44f);  /* ≥70% */
   --fill-danger: light-dark(#cf4d63, #e6788c);/* ≥90% */
@@ -28,7 +31,7 @@
   --pace-rim: light-dark(rgba(255, 255, 255, 0.95), rgba(10, 12, 16, 0.45));
   --pace-halo: light-dark(rgba(14, 16, 21, 0.42), rgba(216, 231, 255, 0.62));
   --pace-halo-soft: light-dark(rgba(14, 16, 21, 0.20), rgba(148, 190, 255, 0.34));
-  --focus: light-dark(#5b6ee8, #8b96f2);
+  --focus: light-dark(#276C8D, #4FA8D0);
 
   --radius: 10px;
   --row-gap: 11px;
@@ -80,7 +83,7 @@ h1 {
 }
 
 .updated {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -94,7 +97,7 @@ h1 {
   background: var(--surface);
   color: var(--ink-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   padding: 3px 10px;
   border-radius: 999px;
   cursor: pointer;
@@ -124,7 +127,7 @@ h1 {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--fill-danger);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .error-banner[hidden] {
@@ -160,7 +163,7 @@ main {
 }
 
 .card-plan {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-faint);
 }
 
@@ -171,13 +174,13 @@ main {
 
 .card-stale {
   margin-left: auto;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .card-error {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-muted);
   padding: 2px 0 1px;
 }
@@ -197,7 +200,7 @@ main {
 }
 
 .window-label {
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: var(--ink-muted);
 }
 
@@ -255,18 +258,14 @@ main {
 
 .window-reset {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
-.window-reset .ahead {
-  color: var(--ink-muted);
-}
-
 .empty {
   color: var(--ink-faint);
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
   padding: 20px 0;
 }
@@ -345,13 +344,13 @@ main {
 }
 
 .setting-label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink);
 }
 
 .setting-note {
   margin: 4px 0 0 23px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-faint);
   line-height: 1.45;
 }
@@ -371,7 +370,7 @@ main {
 
 .segmented button {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--ink-muted);
   background: var(--surface);
   border: none;
