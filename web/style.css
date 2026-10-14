@@ -34,7 +34,7 @@
   --focus: light-dark(#276C8D, #4FA8D0);
 
   --radius: 10px;
-  --row-gap: 11px;
+  --row-gap: 10px;
 }
 
 /* 各家品牌色：只改"正常"档的填充；≥70% / ≥90% 仍统一走警戒色，
@@ -47,13 +47,13 @@
 
 body {
   margin: 0;
-  padding: 10px 12px 12px;
+  padding: 10px 12px 11px;
   background: var(--bg);
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
     "PingFang SC", "Hiragino Sans GB", Roboto, sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -64,12 +64,12 @@ header {
   align-items: baseline;
   justify-content: flex-start;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
 }
 
 h1 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
@@ -78,17 +78,15 @@ h1 {
   margin-left: auto;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
 }
 
 .updated {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 #refresh-btn {
@@ -97,7 +95,7 @@ h1 {
   background: var(--surface);
   color: var(--ink-muted);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   padding: 3px 10px;
   border-radius: 999px;
   cursor: pointer;
@@ -121,13 +119,14 @@ h1 {
 /* ---------- 错误横幅 ---------- */
 
 .error-banner {
-  margin-bottom: 10px;
-  padding: 7px 10px;
+  margin-bottom: 9px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--fill-danger);
-  font-size: 14px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .error-banner[hidden] {
@@ -139,31 +138,37 @@ h1 {
 main {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
 }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 10px 12px 11px;
+  padding: 10px 12px;
 }
 
 .card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 7px;
-  margin-bottom: 8px;
+  gap: 2px 7px;
+  margin-bottom: 7px;
+}
+
+.card-head > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .card-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.005em;
 }
 
 .card-plan {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 
@@ -174,15 +179,16 @@ main {
 
 .card-stale {
   margin-left: auto;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .card-error {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink-muted);
   padding: 2px 0 1px;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- 单个窗口 ---------- */
@@ -200,12 +206,15 @@ main {
 }
 
 .window-label {
-  font-size: 14.5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
   color: var(--ink-muted);
 }
 
 .window-pct {
-  font-size: 21px;
+  flex: none;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
@@ -217,7 +226,7 @@ main {
    一旦裁剪就全没了。填充自己带满圆角，本来也溢不出去。 */
 .bar {
   position: relative;
-  height: 7px;
+  height: 6px;
   border-radius: 999px;
   background: var(--track);
 }
@@ -258,16 +267,17 @@ main {
 
 .window-reset {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .empty {
   color: var(--ink-faint);
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
-  padding: 20px 0;
+  padding: 18px 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -317,11 +327,12 @@ main {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 11px;
 }
 
 .setting-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   cursor: pointer;
@@ -344,19 +355,20 @@ main {
 }
 
 .setting-label {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink);
 }
 
 .setting-note {
   margin: 4px 0 0 23px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--ink-faint);
-  line-height: 1.45;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .setting-row + .setting-row,
-.setting-note + .setting-row { margin-top: 12px; }
+.setting-note + .setting-row { margin-top: 11px; }
 
 /* 配色三选一：并排按钮，选中的那个实底 */
 .segmented {
@@ -370,7 +382,7 @@ main {
 
 .segmented button {
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--ink-muted);
   background: var(--surface);
   border: none;
