@@ -407,4 +407,6 @@ main {
   .setting-row input[type="checkbox"] { width: 22px; height: 22px; }
   .segmented button { min-height: 40px; padding: 0 14px; }
   .setting-note { margin-left: 30px; }
+  /* 手机上 12px 的说明字（更新时间、套餐、重置时间等）放大到 13px */
+  .updated, .card-plan, .card-stale, .window-reset, .setting-note { font-size: 13px; }
 }
