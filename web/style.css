@@ -52,7 +52,7 @@ body {
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
     "PingFang SC", "Hiragino Sans GB", Roboto, sans-serif;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
 }
@@ -83,7 +83,7 @@ h1 {
 }
 
 .updated {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -95,7 +95,7 @@ h1 {
   background: var(--surface);
   color: var(--ink-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   padding: 3px 10px;
   border-radius: 999px;
   cursor: pointer;
@@ -125,7 +125,7 @@ h1 {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--fill-danger);
-  font-size: 13px;
+  font-size: 13.5px;
   overflow-wrap: anywhere;
 }
 
@@ -162,13 +162,13 @@ main {
 }
 
 .card-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   letter-spacing: -0.005em;
 }
 
 .card-plan {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--ink-faint);
 }
 
@@ -179,13 +179,13 @@ main {
 
 .card-stale {
   margin-left: auto;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .card-error {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--ink-muted);
   padding: 2px 0 1px;
   overflow-wrap: anywhere;
@@ -208,7 +208,7 @@ main {
 .window-label {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--ink-muted);
 }
 
@@ -267,7 +267,7 @@ main {
 
 .window-reset {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   overflow-wrap: anywhere;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
@@ -275,7 +275,7 @@ main {
 
 .empty {
   color: var(--ink-faint);
-  font-size: 13px;
+  font-size: 13.5px;
   text-align: center;
   padding: 18px 0;
 }
@@ -355,13 +355,13 @@ main {
 }
 
 .setting-label {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--ink);
 }
 
 .setting-note {
   margin: 4px 0 0 23px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-faint);
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -382,7 +382,7 @@ main {
 
 .segmented button {
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--ink-muted);
   background: var(--surface);
   border: none;
@@ -407,6 +407,6 @@ main {
   .setting-row input[type="checkbox"] { width: 22px; height: 22px; }
   .segmented button { min-height: 40px; padding: 0 14px; }
   .setting-note { margin-left: 30px; }
-  /* 手机上 12px 的说明字（更新时间、套餐、重置时间等）放大到 13px */
-  .updated, .card-plan, .card-stale, .window-reset, .setting-note { font-size: 13px; }
+  /* 手机上 13.5px 的字放到 14px（用户 10-16 试） */
+  body, #refresh-btn, .error-banner, .card-error, .window-label, .empty, .setting-label, .segmented button { font-size: 14px; }
 }
