@@ -16,6 +16,15 @@
 （5 小时 / 周 / 额外 credit）画成一根进度条，条上带一道刻度，标出这个窗口已经
 过去了多少。后台定时轮询，只绑本机回环地址，不写你的凭证文件。
 
+Codex 卡片还显示可用的重置卡：一张直接写过期日期、时分与剩余天数；多张收成「N 张 · 最早一张的日期」一行，
+点开逐张列出（本地时区），7 天内过期会用警示色强调。没有明细时只显示数量，列表不完整时会注明；数量为 0 时隐藏。
+数据来自同一次只读额度查询，不会使用重置卡；降级读取 session 快照时没有这项数据。
+
+Claude 的 OAuth 用量接口不含重置卡，可在 `config.toml` 的 `[providers.claude]` 下用
+`reset_credits = [{ title = "Full reset", expires = "2026-10-23" }]` 手动登记（照 claude.ai
+Settings → Usage → Limit resets 抄），Claude 卡片按同样格式显示标题、过期日与剩余天数；
+只写日期时按本地日历天计算，过期日一过自动不显示，格式不对的条目跳过并记 warning。
+
 <p align="center">
   <img src="panel-dark.png" width="380"
        alt="深色模式下的 ai-usage 面板：三张卡片各对应一家。Claude Pro 的 5 小时窗口 67%、周额度 22%、额外用量 credit 23%（$22.98 / $100）；Codex Plus 周额度 12%；Kimi 的 5 小时窗口 3%、周额度 2%。每根进度条上都有一道发光竖线，标出时间窗口已经过去的比例。">

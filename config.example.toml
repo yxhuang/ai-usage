@@ -22,6 +22,10 @@ first_retry_seconds = 60    # 首次失败后的重试等待；之后每次翻�
 enabled = true
 credentials_path = "~/.claude/.credentials.json"  # 读取时会 expanduser()
 # proxy = "http://127.0.0.1:7890"                 # 走代理时取消注释并改成你的地址
+# 重置卡：OAuth 用量接口不含，照 claude.ai → Settings → Usage → Limit resets 手抄，过期日后自动隐藏
+# reset_credits = [
+#   { title = "Full reset", expires = "2026-10-23" },
+# ]
 
 [providers.codex]
 enabled = true

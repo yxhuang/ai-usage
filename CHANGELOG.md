@@ -10,6 +10,25 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Codex reset-credit count and expiry dates.** The card lists available credits in
+  expiry order using local time, warns within seven days, and labels partial lists;
+  count-only responses remain supported. Uses the existing read-only quota RPC without
+  consuming credits or exposing credit IDs. Session fallback leaves this data absent. When the
+  backend intermittently returns only the count, the last details are kept if the count still matches.
+- **Manual Claude reset credits.** The OAuth usage endpoint lacks them, so
+  `[providers.claude] reset_credits` takes titles and expiry dates copied from the web
+  Usage page; the Claude card shows them and hides each after it expires.
+
+### Changed
+
+- **Compact panel.** Window label, bar and percentage share one row; percentages are whole
+  numbers, labels match the percentage's colour and weight, and "5 小时窗口 / 周额度" become
+  "5h / 周". The line under each bar aligns with the bar; short windows show only a countdown (`剩 1h 17m`), weekly ones
+  `周一 16:59 · 剩 1d 22h`, with the full reset time in the tooltip. Multiple reset credits collapse
+  into one expandable line that stays open across refreshes.
+
 ### Fixed
 
 - **A single click on the tray icon now toggles the panel.** It used to take two: the

@@ -18,6 +18,19 @@ machine and shows one card per provider: every usage window — 5-hour, weekly, 
 credits — as a bar, with a tick marking how much of that window has elapsed. It polls in
 the background, binds to loopback only, and never writes to your credentials.
 
+The Codex card also shows available reset credits: a single credit shows its expiry in local time;
+several collapse into one "N · earliest expiry" line that expands to list each, with a countdown and a
+warning within seven days. If details are unavailable it shows only
+the count; partial lists are labelled. This uses the same read-only quota response and
+never consumes a credit. Session-snapshot fallback has no reset-credit data.
+
+Claude's OAuth usage endpoint does not report reset credits. You can list them by hand under
+`[providers.claude]` in `config.toml` as
+`reset_credits = [{ title = "Full reset", expires = "2026-10-23" }]` (copied from claude.ai
+Settings → Usage → Limit resets); the Claude card shows them the same way. Date-only expiries
+count local calendar days, entries disappear after their expiry date, and malformed entries
+are skipped with a warning.
+
 <p align="center">
   <img src="docs/panel-dark.png" width="380"
        alt="The ai-usage panel in dark mode: three cards, one per provider. Claude Pro shows a 5-hour window at 67%, weekly at 22%, and a $22.98/$100 extra-credit pool at 23%. Codex Plus shows weekly at 12%. Kimi shows a 5-hour window at 3% and weekly at 2%. Each bar carries a glowing vertical tick marking how much of the time window has elapsed: Claude's 5-hour bar stops short of its tick, while its weekly bar has crossed it.">

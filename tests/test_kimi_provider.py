@@ -59,9 +59,9 @@ async def test_ok_response_parsing(tmp_path, monkeypatch):
     # 两个窗口，5h 在前、week 在后；字符串数值换算成百分比
     assert [w.id for w in usage.windows] == ["5h", "week"]
     w5h, wweek = usage.windows
-    assert w5h.label == "5 小时窗口"
+    assert w5h.label == "5h"
     assert w5h.used_pct == 5.0
-    assert wweek.label == "周额度"
+    assert wweek.label == "周"
     assert wweek.used_pct == 13.0
 
     assert w5h.resets_at is not None
@@ -195,7 +195,7 @@ async def test_unknown_duration_generic_rule(tmp_path, monkeypatch):
     # 1440 分钟 = 24 小时，走通用规则；短窗口按时长升序排在 week 前
     assert [w.id for w in usage.windows] == ["5h", "24h", "week"]
     w24h = usage.windows[1]
-    assert w24h.label == "24 小时窗口"
+    assert w24h.label == "24h"
     assert w24h.used_pct == 50.0
 
 

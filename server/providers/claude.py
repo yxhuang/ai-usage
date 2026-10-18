@@ -7,21 +7,23 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
 
-from .base import ProviderUsage, UsageWindow, error_usage, parse_dt
+from .base import (
+    ProviderUsage, ResetCredit, ResetCredits, UsageWindow, error_usage, parse_dt,
+)
 
 logger = logging.getLogger(__name__)
 
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 
 _KIND_MAP: dict[str, tuple[str, str]] = {
-    "session": ("5h", "5 小时窗口"),
-    "weekly_all": ("week", "周额度"),
-    "weekly_opus": ("week_opus", "周 Opus 额度"),
+    "session": ("5h", "5h"),
+    "weekly_all": ("week", "周"),
+    "weekly_opus": ("week_opus", "周 Opus"),
 }
 
 _AUTH_EXPIRED_MSG = "OAuth token 已过期——随便用一次 claude CLI 即自动续期"
@@ -32,6 +34,30 @@ _FORBIDDEN_MSG = (
 )
 
 _CURRENCY_SYMBOLS = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥", "CNY": "¥"}
+
+
+def _manual_reset_credits(raw: list | None) -> list[ResetCredit]:
+    """解析 config.toml 手动登记的重置卡：OAuth 用量接口不含这项，只能照网页 Usage 页抄。
+
+    expires 可写日期（"2026-10-23" 或 TOML 日期）或带时区的时间；坏条目跳过，不阻断额度查询。
+    """
+    credits: list[ResetCredit] = []
+    for item in raw or []:
+        try:
+            expires = item.get("expires")
+            if isinstance(expires, str):
+                expires = (date.fromisoformat(expires) if len(expires) == 10
+                           else parse_dt(expires))
+            elif isinstance(expires, datetime) and expires.tzinfo is None:
+                expires = expires.astimezone()
+            if expires is not None and not isinstance(expires, date):
+                raise ValueError("expires")
+            title = item.get("title")
+            credits.append(ResetCredit(expires_at=expires, title=str(title) if title else None))
+        except Exception:
+            logger.warning("config.toml 的 Claude reset_credits 有一条格式不对，已跳过")
+    credits.sort(key=lambda c: (c.expires_at is None, str(c.expires_at)))
+    return credits
 
 
 def _fmt_money(amount_minor: float, exponent: int, currency: str) -> str:
@@ -86,10 +112,12 @@ class ClaudeProvider:
         credentials_path: str,
         proxy: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        reset_credits: list | None = None,
     ) -> None:
         self._credentials_path = Path(credentials_path).expanduser()
         self._proxy = proxy
         self._transport = transport  # 测试注入用；生产为 None
+        self._reset_credits = _manual_reset_credits(reset_credits)
 
     def _read_credentials(self) -> tuple[str, int | None, str | None]:
         """返回 (access_token, expires_at_ms, plan)。失败抛异常。"""
@@ -104,6 +132,22 @@ class ClaudeProvider:
         return token, expires_at, plan
 
     async def fetch(self) -> ProviderUsage:
+        usage = await self._fetch_usage()
+        usage.reset_credits = self._current_reset_credits()
+        return usage
+
+    def _current_reset_credits(self) -> ResetCredits | None:
+        """手动登记的卡去掉已过期的；一张不剩时不显示。"""
+        now = datetime.now().astimezone()
+        alive = [
+            c for c in self._reset_credits
+            if c.expires_at is None
+            or (c.expires_at >= now.date() if not isinstance(c.expires_at, datetime)
+                else c.expires_at > now)
+        ]
+        return ResetCredits(available_count=len(alive), credits=alive) if alive else None
+
+    async def _fetch_usage(self) -> ProviderUsage:
         # 1. 读凭证
         try:
             token, expires_at_ms, plan = self._read_credentials()

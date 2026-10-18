@@ -74,7 +74,7 @@ function pacePct(w) {
 }
 
 function fmtPct(p) {
-  return (Math.round(p * 10) / 10).toFixed(1) + "%";
+  return Math.round(p) + "%";
 }
 
 function barClass(p) {
@@ -83,23 +83,28 @@ function barClass(p) {
   return "";
 }
 
-function fmtReset(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const when = `${WEEKDAYS[d.getDay()]} ${hh}:${mm}`;
-  const ms = d - new Date();
-  if (ms <= 0) return `${when} 重置（已到点）`;
+/** 剩余时长：1d 22h / 1h 17m / 17m */
+function fmtRemain(ms) {
   const mins = Math.floor(ms / MINUTE);
   const days = Math.floor(mins / 1440);
   const hours = Math.floor((mins % 1440) / 60);
-  const restMins = mins % 60;
-  let remain;
-  if (days > 0) remain = `剩 ${days} 天 ${hours} 小时`;
-  else if (hours > 0) remain = `剩 ${hours} 小时 ${restMins} 分`;
-  else remain = `剩 ${restMins} 分钟`;
-  return `${when} 重置 · ${remain}`;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins % 60}m`;
+  return `${mins}m`;
+}
+
+/** 短窗口（≤1 天）只给倒计时；长窗口给重置时点 + 倒计时，完整说明放悬停提示。 */
+function fmtReset(iso, id) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const when = `${WEEKDAYS[d.getDay()]} ${fmtTime(iso)}`;
+  const ms = d - new Date();
+  const title = `${when} 重置`;
+  if (ms <= 0) return { text: "已到点", title };
+  const duration = windowDurationMs(id);
+  const remain = fmtRemain(ms);
+  const text = duration !== null && duration <= 1440 * MINUTE ? `剩 ${remain}` : `${when} · 剩 ${remain}`;
+  return { text, title };
 }
 
 function fmtTime(iso) {
@@ -148,8 +153,6 @@ function renderWindow(w) {
   const pct = document.createElement("span");
   pct.className = "window-pct";
   pct.textContent = fmtPct(w.used_pct);
-  labelRow.append(label, pct);
-  row.appendChild(labelRow);
 
   const used = Math.min(100, Math.max(0, w.used_pct));
   const bar = document.createElement("div");
@@ -167,18 +170,84 @@ function renderWindow(w) {
     tick.title = `时间已过去 ${Math.round(pace)}%——用量越过这道刻度，说明消耗快于额度回补`;
     bar.appendChild(tick);
   }
-  row.appendChild(bar);
+  labelRow.append(label, bar, pct);
+  row.appendChild(labelRow);
 
   // 底行：有重置时间就显示倒计时，否则显示绝对量（如按金额计费的 credit 池）
-  const resetText = fmtReset(w.resets_at);
-  const parts = [resetText, w.note].filter(Boolean);
+  const reset = fmtReset(w.resets_at, w.id);
+  const parts = [reset?.text, w.note].filter(Boolean);
   if (parts.length > 0) {
     const foot = document.createElement("div");
     foot.className = "window-reset";
     foot.textContent = parts.join(" · ");
+    if (reset) foot.title = reset.title;
     row.appendChild(foot);
   }
   return row;
+}
+
+/** 一张卡的过期描述：日期（有时刻带时刻）+ 剩余天数；warn = 7 天内过期 */
+function creditExpiry(credit) {
+  if (credit.expires_at === null) return { text: "不过期", warn: false };
+  const dayMs = 24 * 60 * MINUTE;
+  if (credit.all_day) {
+    // 只知道过期日（手动登记）：按本地日历天数算，不经 Date 解析以免时区错位
+    const [y, m, d] = credit.expires_at.split("-").map(Number);
+    const today = new Date();
+    const days = Math.round(
+      (Date.UTC(y, m - 1, d) - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / dayMs
+    );
+    const remain = days < 0 ? "已过期" : days === 0 ? "今天" : `${days} 天`;
+    return { text: `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")} · ${remain}`, warn: days <= 7 };
+  }
+  const expires = new Date(credit.expires_at);
+  const ms = expires.getTime() - Date.now();
+  const month = String(expires.getMonth() + 1).padStart(2, "0");
+  const date = String(expires.getDate()).padStart(2, "0");
+  const remain = ms <= 0 ? "已过期" : ms < dayMs ? "1 天内" : `${Math.ceil(ms / dayMs)} 天`;
+  return { text: `${month}-${date} ${fmtTime(credit.expires_at)} · ${remain}`, warn: ms <= 7 * dayMs };
+}
+
+// 轮询会重建卡片，展开状态按 provider 记在这里
+const openResetCredits = new Set();
+
+/** 重置卡收成一行：一张直接写明；多张写「N 张 · 最早一张的日期」，点开看全部。 */
+function renderResetCredits(providerId, resetCredits) {
+  if (!resetCredits || resetCredits.available_count <= 0) return null;
+  const { available_count: count, credits } = resetCredits;
+  const line = (text, warn) => {
+    const el = document.createElement("div");
+    el.className = "window-reset reset-credit" + (warn ? " warn" : "");
+    el.textContent = text;
+    return el;
+  };
+  if (credits === null || credits.length === 0) return line(`🎫 ${count} 张`, false);
+
+  const first = creditExpiry(credits[0]);
+  if (count === 1 && credits.length === 1) {
+    const title = credits[0].title ? `${credits[0].title} · ` : "";
+    return line(`🎫 ${title}${first.text}`, first.warn);
+  }
+
+  const details = document.createElement("details");
+  details.className = "reset-credits";
+  details.open = openResetCredits.has(providerId);
+  details.addEventListener("toggle", () => {
+    if (details.open) openResetCredits.add(providerId);
+    else openResetCredits.delete(providerId);
+  });
+  const summary = document.createElement("summary");
+  summary.className = "window-reset reset-credit" + (first.warn ? " warn" : "");
+  summary.textContent = `🎫 ${count} 张 · ${first.text}`;
+  details.appendChild(summary);
+  for (const credit of credits) {
+    const { text, warn } = creditExpiry(credit);
+    details.appendChild(line((credit.title ? `${credit.title} · ` : "") + text, warn));
+  }
+  if (credits.length < count) {
+    details.appendChild(line(`仅显示 ${credits.length}/${count} 张，列表不完整`, false));
+  }
+  return details;
 }
 
 function renderCard(p) {
@@ -232,6 +301,8 @@ function renderCard(p) {
   for (const w of p.windows) {
     card.appendChild(renderWindow(w));
   }
+  const resetCredits = renderResetCredits(p.id, p.reset_credits);
+  if (resetCredits) card.appendChild(resetCredits);
   return card;
 }
 

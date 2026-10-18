@@ -40,6 +40,7 @@ def build_providers(cfg: Config) -> list[Provider]:
                 ClaudeProvider(
                     credentials_path=pconf.options["credentials_path"],
                     proxy=pconf.options.get("proxy"),
+                    reset_credits=pconf.options.get("reset_credits"),
                 )
             )
         elif pid == "codex":

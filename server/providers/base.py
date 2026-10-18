@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Protocol
 
 
@@ -49,6 +49,53 @@ class UsageWindow:
 
 
 @dataclass
+class ResetCredit:
+    # date：只知道过期日（手动登记，如网页「Expires Oct 23」），前端只显示日期
+    expires_at: datetime | date | None
+    title: str | None = None
+
+    def to_dict(self) -> dict:
+        d: dict = {"expires_at": self.expires_at.isoformat() if self.expires_at else None}
+        if not isinstance(self.expires_at, datetime) and self.expires_at is not None:
+            d["all_day"] = True
+        if self.title:
+            d["title"] = self.title
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ResetCredit":
+        raw = d.get("expires_at")
+        expires = date.fromisoformat(raw) if raw and d.get("all_day") else parse_dt(raw)
+        return cls(expires_at=expires, title=d.get("title"))
+
+
+@dataclass
+class ResetCredits:
+    available_count: int
+    credits: list[ResetCredit] | None  # None：只知道数量；[]：没有卡片明细
+
+    def to_dict(self) -> dict:
+        return {
+            "available_count": self.available_count,
+            "credits": (
+                [c.to_dict() for c in self.credits]
+                if self.credits is not None else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ResetCredits":
+        credits = d.get("credits")
+        return cls(
+            available_count=d["available_count"],
+            credits=(
+                [ResetCredit.from_dict(c) for c in credits]
+                if credits is not None else None
+            ),
+        )
+
+
+@dataclass
 class ProviderUsage:
     id: str
     name: str
@@ -57,6 +104,7 @@ class ProviderUsage:
     status: str  # "ok" | "stale" | "auth_expired" | "error"
     error: str | None
     fetched_at: datetime
+    reset_credits: ResetCredits | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -67,6 +115,7 @@ class ProviderUsage:
             "status": self.status,
             "error": self.error,
             "fetched_at": self.fetched_at.isoformat(),
+            "reset_credits": self.reset_credits.to_dict() if self.reset_credits else None,
         }
 
     @classmethod
@@ -79,6 +128,10 @@ class ProviderUsage:
             status=d.get("status", "ok"),
             error=d.get("error"),
             fetched_at=parse_dt(d["fetched_at"]),
+            reset_credits=(
+                ResetCredits.from_dict(d["reset_credits"])
+                if d.get("reset_credits") is not None else None
+            ),
         )
 
 

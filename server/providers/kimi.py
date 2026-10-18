@@ -180,7 +180,7 @@ class KimiProvider:
             windows.append(
                 UsageWindow(
                     id="week",
-                    label="周额度",
+                    label="周",
                     used_pct=self._used_pct(usage),
                     resets_at=parse_dt(usage.get("resetTime")),
                 )
@@ -204,10 +204,10 @@ class KimiProvider:
     @staticmethod
     def _window_identity(minutes: int) -> tuple[str, str]:
         if minutes == 300:
-            return "5h", "5 小时窗口"
+            return "5h", "5h"
         if minutes % 60 == 0:
             hours = minutes // 60
-            return f"{hours}h", f"{hours} 小时窗口"
+            return f"{hours}h", f"{hours}h"
         return f"{minutes}m", f"{minutes} 分钟窗口"
 
     @staticmethod

@@ -7,7 +7,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from server.cache import Cache
-from server.providers.base import ProviderUsage, UsageWindow, parse_dt
+from server.providers.base import (
+    ProviderUsage, ResetCredit, ResetCredits, UsageWindow, parse_dt,
+)
 
 
 def _usage(fetched_at: datetime | None = None, status: str = "ok") -> ProviderUsage:
@@ -45,6 +47,22 @@ def test_roundtrip_lossless(tmp_path):
     restored = cache2.get("claude")
     assert restored is not None
     assert restored.to_dict() == original.to_dict()
+
+
+def test_reset_credits_roundtrip_and_old_cache(tmp_path):
+    path = tmp_path / "cache.json"
+    usage = _usage()
+    manual = ResetCredit(datetime.now(timezone.utc).date(), title="Full reset")
+    for credits in (None, [], [ResetCredit(datetime.now(timezone.utc)), ResetCredit(None), manual]):
+        usage.reset_credits = ResetCredits(available_count=3, credits=credits)
+        Cache(path).set(usage)
+        restored = Cache(path)
+        restored.load()
+        assert restored.get(usage.id).to_dict() == usage.to_dict()
+
+    old = usage.to_dict()
+    old.pop("reset_credits")
+    assert ProviderUsage.from_dict(old).reset_credits is None
 
 
 def test_atomic_write_no_tmp_left(tmp_path):

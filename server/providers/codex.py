@@ -17,7 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .base import ProviderUsage, UsageWindow, error_usage, parse_dt
+from .base import (
+    ProviderUsage, ResetCredit, ResetCredits, UsageWindow, error_usage, parse_dt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ class CodexProvider:
         self._injected_rpc_call = rpc_call
         self._app_server_failures = 0
         self._last_app_server_attempt: float | None = None
+        self._last_credit_details: list[ResetCredit] | None = None
 
     async def fetch(self) -> ProviderUsage:
         if self._should_try_app_server():
@@ -72,6 +75,13 @@ class CodexProvider:
                     status="ok",
                     fetched_at=datetime.now(timezone.utc),
                 )
+                try:
+                    usage.reset_credits = self._with_last_details(
+                        self._parse_reset_credits(rpc_result.get("rateLimitResetCredits"))
+                    )
+                except Exception as exc:
+                    # 重置卡是附加信息，报文异常只丢这一块，不拖垮额度窗口
+                    logger.warning("Codex 重置卡解析失败（%s）", type(exc).__name__)
             except Exception as exc:
                 self._app_server_failures += 1
                 logger.warning(
@@ -375,6 +385,42 @@ class CodexProvider:
             fetched_at=fetched_at,
         )
 
+    def _with_last_details(self, parsed: ResetCredits | None) -> ResetCredits | None:
+        """后端明细查询偶发失败时只回数量（credits=None）：数量与上次明细（去掉已过期）一致就沿用；
+        数量变了（如用掉一张）不知道是哪张，只显示数量。"""
+        if parsed is None or parsed.credits is not None:
+            self._last_credit_details = parsed.credits if parsed else None
+            return parsed
+        now = datetime.now(timezone.utc)
+        alive = [
+            c for c in self._last_credit_details or []
+            if c.expires_at is None or c.expires_at > now
+        ]
+        if alive and len(alive) == parsed.available_count:
+            parsed.credits = alive
+        return parsed
+
+    @staticmethod
+    def _parse_reset_credits(raw: Any) -> ResetCredits | None:
+        if raw is None:
+            return None
+        credits = raw.get("credits")
+        available = None
+        if credits is not None:
+            available = [
+                ResetCredit(
+                    expires_at=(
+                        datetime.fromtimestamp(credit["expiresAt"], tz=timezone.utc)
+                        if credit.get("expiresAt") is not None else None
+                    )
+                )
+                for credit in credits if credit.get("status") == "available"
+            ]
+            available.sort(
+                key=lambda c: c.expires_at or datetime.max.replace(tzinfo=timezone.utc)
+            )
+        return ResetCredits(available_count=raw["availableCount"], credits=available)
+
     @staticmethod
     def _value(data: dict[str, Any], camel: str, snake: str) -> Any:
         if camel in data:
@@ -384,10 +430,10 @@ class CodexProvider:
     @staticmethod
     def _window_identity(duration_mins: int) -> tuple[str, str]:
         if duration_mins == 300:
-            return "5h", "5 小时窗口"
+            return "5h", "5h"
         if duration_mins == 10080:
-            return "week", "周额度"
+            return "week", "周"
         if duration_mins % 60 == 0:
             hours = duration_mins // 60
-            return f"{hours}h", f"{hours} 小时窗口"
+            return f"{hours}h", f"{hours}h"
         return f"{duration_mins}m", f"{duration_mins} 分钟窗口"

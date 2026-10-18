@@ -46,10 +46,116 @@ async def test_app_server_ok_week_window_and_plan(tmp_path):
     assert usage.plan == "Testplan"
     assert [window.id for window in usage.windows] == ["week"]
     assert usage.windows[0].used_pct == 14.0
-    assert usage.windows[0].label == "周额度"
+    assert usage.windows[0].label == "周"
     assert usage.windows[0].resets_at is not None
     assert usage.windows[0].resets_at.tzinfo is not None
     assert usage.windows[0].resets_at.utcoffset() is not None
+    assert usage.reset_credits.available_count == 0
+    assert usage.reset_credits.credits == []
+
+
+@pytest.mark.parametrize("credits", [None, []])
+async def test_reset_credits_count_and_empty_details(tmp_path, credits):
+    payload = {
+        **APP_SERVER_PAYLOAD,
+        "rateLimitResetCredits": {
+            "availableCount": 3 if credits is None else 0, "credits": credits,
+        },
+    }
+
+    async def rpc():
+        return payload
+
+    usage = await CodexProvider(sessions_dir=str(tmp_path), rpc_call=rpc).fetch()
+    assert usage.status == "ok"
+    assert usage.to_dict()["reset_credits"] == {
+        "available_count": 3 if credits is None else 0,
+        "credits": credits,
+    }
+
+
+async def test_reset_credits_filtered_sorted_and_private(tmp_path, caplog):
+    calls = 0
+    payload = {
+        **APP_SERVER_PAYLOAD,
+        "rateLimitResetCredits": {
+            "availableCount": 4,  # 后端只返回其中三张可用卡
+            "credits": [
+                {"status": "available", "expiresAt": None},
+                {"status": "available", "expiresAt": 1792698902},
+                {"status": "redeemed", "expiresAt": 1},
+                {"status": "redeeming", "expiresAt": 2},
+                {"status": "unknown", "expiresAt": 3},
+                {"status": "available", "expiresAt": 1790106902},
+            ],
+        },
+    }
+    for credit in payload["rateLimitResetCredits"]["credits"]:
+        credit.update(id="private-card-id", title=None, description="private-description")
+
+    async def rpc():
+        nonlocal calls
+        calls += 1
+        return payload
+
+    usage = await CodexProvider(sessions_dir=str(tmp_path), rpc_call=rpc).fetch()
+    assert usage.status == "ok"
+    assert calls == 1
+    expected = {
+        "available_count": 4,
+        "credits": [
+            {"expires_at": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()}
+            for ts in (1790106902, 1792698902)
+        ] + [{"expires_at": None}],
+    }
+    assert usage.to_dict()["reset_credits"] == expected
+    assert "private-card-id" not in json.dumps(usage.to_dict()) + caplog.text
+    assert "private-description" not in json.dumps(usage.to_dict()) + caplog.text
+
+
+@pytest.mark.parametrize("include_field", [False, True])
+async def test_null_or_missing_reset_credits(tmp_path, include_field):
+    async def rpc():
+        payload = {**APP_SERVER_PAYLOAD}
+        payload.pop("rateLimitResetCredits", None)
+        if include_field:
+            payload["rateLimitResetCredits"] = None
+        return payload
+
+    usage = await CodexProvider(sessions_dir=str(tmp_path), rpc_call=rpc).fetch()
+    assert usage.status == "ok"
+    assert usage.reset_credits is None
+
+
+async def test_count_only_reuses_last_details_when_count_matches(tmp_path):
+    future = int(datetime.now(timezone.utc).timestamp()) + 86400
+    detail = {"id": "x", "resetType": "codexRateLimits", "status": "available",
+              "grantedAt": 1, "expiresAt": future}
+    replies = iter([
+        {"availableCount": 2, "credits": [detail, {**detail, "expiresAt": future + 60}]},
+        {"availableCount": 2, "credits": None},  # 明细查询偶发失败：沿用上次
+        {"availableCount": 1, "credits": None},  # 用掉一张：不知道是哪张，只给数量
+    ])
+
+    async def rpc():
+        return {**APP_SERVER_PAYLOAD, "rateLimitResetCredits": next(replies)}
+
+    provider = CodexProvider(sessions_dir=str(tmp_path), rpc_call=rpc)
+    first = (await provider.fetch()).to_dict()["reset_credits"]
+    assert (await provider.fetch()).to_dict()["reset_credits"] == first
+    assert (await provider.fetch()).to_dict()["reset_credits"] == {
+        "available_count": 1, "credits": None,
+    }
+
+
+async def test_malformed_reset_credits_keep_windows(tmp_path):
+    async def rpc():
+        return {**APP_SERVER_PAYLOAD, "rateLimitResetCredits": {"credits": "bad"}}
+
+    usage = await CodexProvider(sessions_dir=str(tmp_path), rpc_call=rpc).fetch()
+    assert usage.status == "ok"
+    assert usage.windows
+    assert usage.reset_credits is None
 
 
 async def test_secondary_window_sorted_before_week(tmp_path):
@@ -70,8 +176,8 @@ async def test_secondary_window_sorted_before_week(tmp_path):
     assert usage.status == "ok"
     assert [window.id for window in usage.windows] == ["5h", "week"]
     assert [window.label for window in usage.windows] == [
-        "5 小时窗口",
-        "周额度",
+        "5h",
+        "周",
     ]
     assert [window.used_pct for window in usage.windows] == [12.0, 14.0]
 
@@ -107,6 +213,7 @@ async def test_app_server_failure_falls_back_to_stale_session(tmp_path, failure)
     assert usage.windows[0].used_pct == 14.0
     assert usage.fetched_at == SESSION_TIMESTAMP
     assert usage.fetched_at.tzinfo is not None
+    assert usage.reset_credits is None
 
 
 async def test_failure_threshold_skips_new_process_attempts(tmp_path):
@@ -168,7 +275,7 @@ async def test_unknown_window_minutes_uses_generic_rule(tmp_path):
     assert usage.status == "stale"
     assert usage.plan == "Team"
     assert usage.windows[0].id == "72h"
-    assert usage.windows[0].label == "72 小时窗口"
+    assert usage.windows[0].label == "72h"
     assert usage.windows[0].used_pct == 25.0
 
 

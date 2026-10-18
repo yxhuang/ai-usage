@@ -78,8 +78,8 @@ async def test_ok_response_parsing(tmp_path):
     assert wweek.used_pct == 22.0
     assert wcredit.used_pct == 33.0
 
-    assert w5h.label == "5 小时窗口"
-    assert wweek.label == "周额度"
+    assert w5h.label == "5h"
+    assert wweek.label == "周"
     assert wcredit.label == "额外用量 credit"
 
     assert w5h.resets_at is not None
@@ -270,3 +270,34 @@ async def test_401_still_reports_auth_expired(tmp_path):
     usage = await provider.fetch()
     assert usage.status == "auth_expired"
     assert "claude CLI" in usage.error
+
+
+async def test_manual_reset_credits_sorted_expired_hidden_bad_skipped(tmp_path, caplog):
+    today = datetime.now().astimezone().date()
+    provider = ClaudeProvider(
+        credentials_path=str(tmp_path / "nonexistent.json"),
+        reset_credits=[
+            {"title": "Full reset", "expires": (today + timedelta(days=6)).isoformat()},
+            {"title": "5-hour reset", "expires": today},  # TOML 日期；当天仍有效
+            {"title": "旧卡", "expires": (today - timedelta(days=1)).isoformat()},
+            {"title": "坏条目", "expires": 20261023},
+        ],
+    )
+    # 凭证读取失败也照样带上手动登记的卡
+    usage = await provider.fetch()
+    assert usage.status == "error"
+    assert usage.to_dict()["reset_credits"] == {
+        "available_count": 2,
+        "credits": [
+            {"expires_at": today.isoformat(), "all_day": True, "title": "5-hour reset"},
+            {"expires_at": (today + timedelta(days=6)).isoformat(), "all_day": True,
+             "title": "Full reset"},
+        ],
+    }
+    assert "格式不对" in caplog.text
+
+
+async def test_no_manual_reset_credits(tmp_path):
+    usage = await _make_provider(tmp_path).fetch()
+    assert usage.status == "ok"
+    assert usage.reset_credits is None

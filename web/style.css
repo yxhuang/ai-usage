@@ -197,23 +197,40 @@ main {
   margin-top: var(--row-gap);
 }
 
+/* 标签 · 进度条 · 百分比同一行；标签与百分比定宽，各行进度条左右对齐。
+   标签与百分比同粗、颜色略暗；进度条下方那行与进度条左端对齐 */
+.window {
+  --label-w: 20px;
+  --label-gap: 6px;
+}
+
 .window-label-row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
+  align-items: center;
+  gap: var(--label-gap);
 }
 
 .window-label {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  flex: none;
+  min-width: var(--label-w);
   font-size: 13.5px;
-  color: var(--ink-muted);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 70%, var(--ink-muted));
+}
+
+.window-label-row > .bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.window-label-row + .window-reset {
+  padding-left: calc(var(--label-w) + var(--label-gap));
 }
 
 .window-pct {
   flex: none;
+  min-width: 2.2em;
+  text-align: right;
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -394,9 +411,20 @@ main {
 .segmented button:hover { color: var(--ink); }
 .segmented button[aria-pressed="true"] { color: var(--surface); background: var(--ink); }
 
-.setting-note.warn {
+.setting-note.warn,
+.window-reset.warn {
   color: var(--fill-warn);
 }
+
+/* 多张重置卡：摘要一行，点开逐张列出 */
+.reset-credits > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.reset-credits > summary::-webkit-details-marker { display: none; }
+.reset-credits > summary::after { content: " ▸"; }
+.reset-credits[open] > summary::after { content: " ▾"; }
+.reset-credits > div.reset-credit { padding-left: 1.4em; }
 
 /* 触屏（手机经 workbench 反向代理打开）：点按目标至少 44px。
    资源与接口都用相对路径，面板挂在 /pages/ai-usage/ 这样的子路径下也能用。 */
