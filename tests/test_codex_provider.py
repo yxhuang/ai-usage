@@ -247,6 +247,7 @@ async def test_no_sessions_and_app_server_failure_is_error(tmp_path):
     assert usage.windows == []
     assert "app-server" in usage.error
     assert "sessions" in usage.error
+    assert "[providers.codex] proxy" in usage.error
 
 
 async def test_unknown_window_minutes_uses_generic_rule(tmp_path):

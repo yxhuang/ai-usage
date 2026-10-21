@@ -35,6 +35,9 @@ _NO_KEY_MSG_SERVICE = (
     "或用 api_key_file 指向含该变量的文件"
 )
 _AUTH_EXPIRED_MSG = "Kimi API key 无效或已过期，请更新 key"
+# 订阅到期后 key 仍能通过鉴权，接口回 200，但报文是空对象（2026-10 实测为 {}），
+# limits/usage 都没有——这不是报文损坏，单独报到期
+_NO_PLAN_MSG = "Kimi 订阅已到期（key 有效，但接口未返回任何额度）"
 
 
 class KimiProvider:
@@ -128,6 +131,12 @@ class KimiProvider:
         # 3. 解析（user 字段是账号身份信息，一律不取）
         try:
             payload = resp.json()
+            if (
+                isinstance(payload, dict)
+                and "limits" not in payload
+                and "usage" not in payload
+            ):
+                return error_usage(self.id, self.name, "auth_expired", _NO_PLAN_MSG)
             windows = self._parse_windows(payload)
             plan = self._parse_plan(payload)
         except Exception as exc:

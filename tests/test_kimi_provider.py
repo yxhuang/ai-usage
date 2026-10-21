@@ -103,6 +103,15 @@ async def test_http_401_403_auth_expired(tmp_path, monkeypatch, status_code):
     assert "过期" in usage.error
 
 
+@pytest.mark.parametrize("body", ["{}", '{"user": {"userId": "redacted"}}'])
+async def test_no_quota_fields_reports_subscription_expired(tmp_path, monkeypatch, body):
+    usage = await _make_provider(tmp_path, monkeypatch, body=body).fetch()
+    assert usage.status == "auth_expired"
+    assert usage.windows == []
+    assert "到期" in usage.error
+    assert "redacted" not in json.dumps(usage.to_dict())
+
+
 async def test_http_500_error(tmp_path, monkeypatch):
     usage = await _make_provider(tmp_path, monkeypatch, status_code=500).fetch()
     assert usage.status == "error"

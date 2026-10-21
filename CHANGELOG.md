@@ -31,6 +31,14 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
 
 ### Fixed
 
+- **An expired Kimi subscription is reported as expired.** After the plan lapses the key still
+  authenticates and the usage endpoint answers 200 with an empty object, which the card used to
+  show as "响应报文解析失败" (response parse failure). A body with neither `limits` nor `usage`
+  now yields `auth_expired` with "Kimi 订阅已到期".
+- **The Codex "nothing available" error now mentions the proxy.** When app-server failed and no
+  session snapshot existed, the card gave no hint that app-server needs to reach chatgpt.com;
+  on networks that need a proxy this is the usual cause. It now points to
+  `[providers.codex] proxy`, as the snapshot-fallback note already did.
 - **A single click on the tray icon now toggles the panel.** It used to take two: the
   show/hide decision asked "does Windows think this window still exists"
   (`IsWindowVisible`, plus an `IsIconic` check), and a window can be perfectly

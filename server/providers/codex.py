@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 RpcCall = Callable[[], Awaitable[dict[str, Any]]]
 
 _FALLBACK_ERROR = (
-    "无法获取 Codex 用量：app-server 不可用，且未找到可用的 sessions 限额记录"
+    "无法获取 Codex 用量：app-server 不可用，且未找到可用的 sessions 限额记录。"
+    "app-server 需要连 chatgpt.com，如需代理请在 config.toml 配 [providers.codex] proxy"
 )
 _FALLBACK_NOTE = (
     "数据来自本地会话快照——app-server 不可用。它需要连 chatgpt.com，"
