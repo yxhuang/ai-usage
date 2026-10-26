@@ -18,6 +18,9 @@ machine and shows one card per provider: every usage window — 5-hour, weekly, 
 credits — as a bar, with a tick marking how much of that window has elapsed. It polls in
 the background, binds to loopback only, and never writes to your credentials.
 
+On touch screens, small status and reset text uses 14px type. The header keeps tighter
+vertical spacing while refresh and settings retain 44px touch targets.
+
 The Codex card also shows available reset credits: a single credit shows its expiry in local time;
 several collapse into one "N · earliest expiry" line that expands to list each, with a countdown and a
 warning within seven days. If details are unavailable it shows only

@@ -429,6 +429,11 @@ main {
 /* 触屏（手机经 workbench 反向代理打开）：点按目标至少 44px。
    资源与接口都用相对路径，面板挂在 /pages/ai-usage/ 这样的子路径下也能用。 */
 @media (pointer: coarse) {
+  body { padding-top: 6px; }
+  header { align-items: center; margin-bottom: 5px; }
+  .header-right { align-items: center; }
+  .updated, .card-stale, .window-reset, .setting-note { font-size: 14px; }
+  .card-name { font-size: 15px; }
   #refresh-btn { min-height: 44px; padding: 0 16px; }
   .gear { width: 44px; height: 44px; }
   .setting-row { min-height: 44px; }
@@ -437,4 +442,5 @@ main {
   .setting-note { margin-left: 30px; }
   /* 手机上 13.5px 的字放到 14px（用户 10-16 试） */
   body, #refresh-btn, .error-banner, .card-error, .window-label, .empty, .setting-label, .segmented button { font-size: 14px; }
+  .window-label { font-size: 15px; }
 }
