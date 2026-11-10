@@ -12,6 +12,9 @@ While the version stays below 1.0.0, minor bumps may change behaviour.
 
 ### Added
 
+- **Per-model weekly limits are labelled by model.** A `weekly_scoped` limit now shows as
+  "周 <model>" (for example 周 Fable) instead of the raw kind, with its cap as a share of the
+  weekly limit taken from `weekly_scoped_shares`.
 - **Codex reset-credit count and expiry dates.** The card lists available credits in
   expiry order using local time, warns within seven days, and labels partial lists;
   count-only responses remain supported. Uses the existing read-only quota RPC without

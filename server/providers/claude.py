@@ -221,16 +221,27 @@ class ClaudeProvider:
             # limits 是主数据源，缺失/类型不对一律按解析失败处理，
             # 不能静默返回"健康但没有额度"
             raise ValueError("limits missing or not a list")
+        # weekly_scoped_shares 按 limits 下标给出分模型周额度占总周额度的上限
+        caps = {
+            s.get("limit_index"): s.get("allowance_percent_of_weekly")
+            for s in payload.get("weekly_scoped_shares") or []
+            if isinstance(s, dict)
+        }
         windows: list[UsageWindow] = []
-        for item in limits:
+        for idx, item in enumerate(limits):
             kind = item.get("kind", "")
             wid, label = _KIND_MAP.get(kind, (kind, kind))
+            model = ((item.get("scope") or {}).get("model") or {}).get("display_name")
+            if kind == "weekly_scoped" and model:
+                wid, label = f"week_{model.lower()}", f"周 {model}"
+            cap = caps.get(idx)
             windows.append(
                 UsageWindow(
                     id=wid,
                     label=label,
                     used_pct=float(item.get("percent") or 0.0),
                     resets_at=parse_dt(item.get("resets_at")),
+                    note=f"上限为周额度 {cap:g}%" if isinstance(cap, (int, float)) else None,
                 )
             )
 

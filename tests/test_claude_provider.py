@@ -272,6 +272,31 @@ async def test_401_still_reports_auth_expired(tmp_path):
     assert "claude CLI" in usage.error
 
 
+async def test_weekly_scoped_labelled_by_model_with_cap(tmp_path):
+    payload = json.loads(FIXTURE)
+    payload["limits"].append(
+        {
+            "kind": "weekly_scoped",
+            "group": "weekly",
+            "percent": 3,
+            "severity": "normal",
+            "resets_at": "2026-11-16T09:00:00+00:00",
+            "scope": {"model": {"id": None, "display_name": "Fable"}, "surface": None},
+            "is_active": False,
+        }
+    )
+    payload["weekly_scoped_shares"] = [
+        {"limit_index": len(payload["limits"]) - 1, "used_percent_of_weekly": 0,
+         "allowance_percent_of_weekly": 50}
+    ]
+    usage = await _make_provider(tmp_path, body=json.dumps(payload)).fetch()
+    w = next(w for w in usage.windows if w.id == "week_fable")
+    assert w.label == "周 Fable"
+    assert w.used_pct == 3.0
+    assert w.note == "上限为周额度 50%"
+    assert [x.id for x in usage.windows] == ["5h", "week", "week_fable", "extra_credits"]
+
+
 async def test_manual_reset_credits_sorted_expired_hidden_bad_skipped(tmp_path, caplog):
     today = datetime.now().astimezone().date()
     provider = ClaudeProvider(
